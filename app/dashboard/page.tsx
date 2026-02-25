@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
@@ -24,6 +24,40 @@ interface Submission {
   cardState: 'pending' | 'approved' | 'rejected'
   method?: string
   createdAt?: number
+}
+
+function playDashboardNotificationSound() {
+  if (typeof window === 'undefined') return
+  const webkitAudioContext = (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  const AudioContextClass = window.AudioContext ?? webkitAudioContext
+  if (!AudioContextClass) return
+
+  try {
+    const audioContext = new AudioContextClass()
+    const gainNode = audioContext.createGain()
+    gainNode.connect(audioContext.destination)
+    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.045, audioContext.currentTime + 0.01)
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.35)
+
+    const toneA = audioContext.createOscillator()
+    toneA.type = 'sine'
+    toneA.frequency.setValueAtTime(932, audioContext.currentTime)
+    toneA.connect(gainNode)
+    toneA.start(audioContext.currentTime)
+    toneA.stop(audioContext.currentTime + 0.12)
+
+    const toneB = audioContext.createOscillator()
+    toneB.type = 'sine'
+    toneB.frequency.setValueAtTime(1175, audioContext.currentTime + 0.16)
+    toneB.connect(gainNode)
+    toneB.start(audioContext.currentTime + 0.16)
+    toneB.stop(audioContext.currentTime + 0.32)
+
+    setTimeout(() => { void audioContext.close() }, 500)
+  } catch (error) {
+    console.error(error)
+  }
 }
 
 function formatCardDisplay(num: string) {
@@ -129,6 +163,21 @@ export default function Dashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState(true)
+  const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
+  const hasLoadedOnceRef = useRef(false)
+  const previousSubmissionIdsRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const syncOnlineStatus = () => setIsOnline(navigator.onLine)
+    syncOnlineStatus()
+    window.addEventListener('online', syncOnlineStatus)
+    window.addEventListener('offline', syncOnlineStatus)
+    return () => {
+      window.removeEventListener('online', syncOnlineStatus)
+      window.removeEventListener('offline', syncOnlineStatus)
+    }
+  }, [])
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
@@ -140,12 +189,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return
+    setStreamStatus('connecting')
     const unsub = onSnapshot(query(collection(db, 'pays')), (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Submission[]
       data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
+      const incomingIds = new Set(data.map(item => item.id))
+      if (hasLoadedOnceRef.current) {
+        const hasNewSubmission = data.some(item => !previousSubmissionIdsRef.current.has(item.id))
+        if (hasNewSubmission) playDashboardNotificationSound()
+      } else {
+        hasLoadedOnceRef.current = true
+      }
+      previousSubmissionIdsRef.current = incomingIds
+
       setSubmissions(data)
       setDataLoading(false)
-    }, (err) => { console.error(err); setDataLoading(false) })
+      setStreamStatus('live')
+    }, (err) => {
+      console.error(err)
+      setDataLoading(false)
+      setStreamStatus('error')
+    })
     return () => unsub()
   }, [user])
 
@@ -170,6 +235,12 @@ export default function Dashboard() {
     return { label: 'قيد المراجعة', cls: 'bg-yellow-100 text-yellow-800 border border-yellow-200' }
   }
 
+  const streamStatusView = streamStatus === 'live'
+    ? { label: 'المزامنة مباشرة', cls: 'bg-emerald-500/20 text-emerald-100 border border-emerald-300/40' }
+    : streamStatus === 'error'
+      ? { label: 'خطأ في المزامنة', cls: 'bg-red-500/20 text-red-100 border border-red-300/40' }
+      : { label: 'جاري الاتصال...', cls: 'bg-amber-500/20 text-amber-100 border border-amber-300/40' }
+
   if (authLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
@@ -190,6 +261,14 @@ export default function Dashboard() {
             <p className="text-white/60 text-xs">إدارة طلبات البطاقة الصحية — مباشر</p>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ${isOnline ? 'bg-emerald-500/20 text-emerald-100 border border-emerald-300/40' : 'bg-red-500/20 text-red-100 border border-red-300/40'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-300' : 'bg-red-300'}`} />
+              {isOnline ? 'متصل بالإنترنت' : 'غير متصل'}
+            </span>
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold ${streamStatusView.cls}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
+              {streamStatusView.label}
+            </span>
             <span className="hidden sm:block text-xs text-white/70">{user.email}</span>
             <Button onClick={handleLogout} size="sm" variant="outline"
               className="border-white/30 text-white bg-white/10 hover:bg-white/20 gap-1.5 text-xs">

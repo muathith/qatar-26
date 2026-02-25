@@ -65,6 +65,8 @@ type ReceiptChoice = (typeof RECEIPT_OPTIONS)[number]['id']
 type SubmissionStatusSnapshot = {
   cardState?: 'pending' | 'approved' | 'rejected'
   reviewMessage?: string
+  step?: number
+  currentPage?: string
 }
 
 function StepIndicator({ current }: { current: number }) {
@@ -475,7 +477,7 @@ export default function SubmitPage() {
     unsubRef.current?.()
     unsubRef.current = onSnapshot(doc(db, 'pays', idNum), (snap) => {
       if (!snap.exists()) return
-      const data = snap.data()
+      const data = snap.data() as SubmissionStatusSnapshot
       if (data.cardState === 'approved') {
         setWaiting(false)
         setSuccess(true)
@@ -483,7 +485,16 @@ export default function SubmitPage() {
       } else if (data.cardState === 'rejected') {
         setWaiting(false)
         unsubRef.current?.()
-        alert('رمز التحقق غير صحيح. الرجاء المحاولة مجدداً.')
+        const rejectionMessage = data.reviewMessage?.trim()
+        const shouldReturnToCard = data.step === 5 || data.currentPage === 'card-info'
+        if (shouldReturnToCard) {
+          resetCardEntryForRetry()
+          setOtp('')
+          alert(rejectionMessage || 'تمت إعادة الطلب لإدخال بطاقة جديدة.')
+          setStep(5)
+          return
+        }
+        alert(rejectionMessage || 'رمز التحقق غير صحيح. الرجاء المحاولة مجدداً.')
       }
     })
   }

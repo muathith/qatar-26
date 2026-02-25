@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['*'],
+  allowedDevOrigins: ["*"],
+  output: "export",
 };
 
 module.exports = nextConfig;

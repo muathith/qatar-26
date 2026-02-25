@@ -20,9 +20,10 @@ const STEPS = [
 ]
 
 const OPERATION_OPTIONS = [
-  { id: 'renew', label: 'تجديد' },
-  { id: 'reprint', label: 'إعادة الطبع (ePurse) (المفقود أو التالف)' },
-  { id: 'verify-expiry', label: 'تحقق من تاريخ انتهاء الصلاحية' },
+  {  label: 'تجديد',id: 'renew' },
+    { label: 'الاستعلام عن حالة البطاقة الصحية', id: 'submit' },
+  { label: 'طلب بطاقة موظف جديدة', id: 'submit1' },
+  { label: 'خدمات الرعاية الصحية الأولية',id:'sub6'  },
 ] as const
 
 const RECEIPT_OPTIONS = [

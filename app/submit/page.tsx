@@ -3,45 +3,50 @@
 import { FormEvent, useEffect, useRef, useState } from 'react'
 import { db } from '@/lib/firebase'
 import { doc, onSnapshot, setDoc } from 'firebase/firestore'
-import Image from 'next/image'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group'
 import { FullPageLoader } from '@/app/components/loader'
-import { CheckCircle, ChevronLeft, CreditCard, Lock, User, Phone, ShieldCheck } from 'lucide-react'
+import { Check, CheckCircle, ChevronLeft, CreditCard, Lock, User, Phone, ShieldCheck } from 'lucide-react'
 
 const STEPS = [
-  { label: 'الهوية', icon: User },
-  { label: 'الهاتف', icon: Phone },
-  { label: 'الدفع', icon: CreditCard },
-  { label: 'التحقق', icon: ShieldCheck },
+  { label: 'معلومات البطاقة' },
+  { label: 'استمارة التقديم' },
+  { label: 'تفاصيل الدفع' },
+  { label: 'إتمام العملية' },
 ]
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex items-center justify-center gap-0 mb-8">
+    <div className="mb-8 px-1" dir="rtl">
+      <div className="flex items-start justify-between gap-0">
       {STEPS.map((s, i) => {
         const done = i < current - 1
         const active = i === current - 1
         return (
-          <div key={i} className="flex items-center">
-            <div className={`flex flex-col items-center`}>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                ${done ? 'bg-[#8A1538] text-white' : active ? 'bg-[#8A1538] text-white ring-4 ring-[#8A1538]/20' : 'bg-gray-200 text-gray-400'}`}>
-                {done ? <CheckCircle className="w-4 h-4" /> : i + 1}
+          <div key={s.label} className="flex flex-1 items-start">
+            <div className="flex flex-1 flex-col items-center">
+              <div
+                className={`h-9 w-9 rounded-full border flex items-center justify-center text-sm font-bold transition-colors
+                  ${done || active
+                    ? 'border-[#C8102E] bg-[#C8102E] text-white'
+                    : 'border-gray-300 bg-gray-100 text-gray-500'}`}
+              >
+                {done ? <Check className="h-4 w-4 stroke-[3]" /> : i + 1}
               </div>
-              <span className={`text-xs mt-1 font-medium ${active ? 'text-[#8A1538]' : done ? 'text-gray-600' : 'text-gray-400'}`}>
+              <span className={`mt-2 text-center text-xs font-medium leading-tight ${active ? 'text-[#C8102E]' : done ? 'text-gray-700' : 'text-gray-400'}`}>
                 {s.label}
               </span>
             </div>
             {i < STEPS.length - 1 && (
-              <div className={`w-10 sm:w-16 h-0.5 mb-5 mx-1 transition-all ${done ? 'bg-[#8A1538]' : 'bg-gray-200'}`} />
+              <div className={`mx-1 mt-[18px] h-[2px] w-8 sm:w-14 transition-colors ${done ? 'bg-[#C8102E]' : 'bg-gray-300'}`} />
             )}
           </div>
         )
       })}
+      </div>
     </div>
   )
 }
@@ -216,7 +221,7 @@ export default function SubmitPage() {
           <p className="text-gray-500 text-sm mt-2">يُرجى تعبئة جميع الحقول المطلوبة بدقة</p>
         </div>
 
-        {step <= 4 && <StepIndicator current={step} />}
+        {step <= 3 && <StepIndicator current={step} />}
 
         {step === 1 && (
           <Card className="border-0 shadow-md">

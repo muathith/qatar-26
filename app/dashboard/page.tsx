@@ -89,7 +89,7 @@ function cardStatePillClass(state: CardStateValue) {
   return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
 }
 
-function getCardStateHistory(sub: Submission) {
+function getCardStateHistory(sub: Submission): CardStateHistoryEntry[] {
   const raw = Array.isArray(sub.cardStateHistory) ? sub.cardStateHistory : []
   const normalized = raw
     .filter((entry): entry is CardStateHistoryEntry => !!entry && !!entry.state)
@@ -106,6 +106,7 @@ function getCardStateHistory(sub: Submission) {
     return [{
       state: sub.cardState,
       at: sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+      by: undefined,
     }]
   }
 

@@ -34,12 +34,19 @@ const RECEIPT_OPTIONS = [
 const YEAR_OPTIONS = ['1', '2', '3', '4', '5'] as const
 const FEE_PER_YEAR = 100
 const DEFAULT_CURRENT_EXPIRY_DATE = '2026-02-23'
-const PAYMENT_METHOD_OPTIONS = [
+type PaymentMethod = 'mastercard' | 'visa'
+
+type PaymentMethodOption = {
+  id: PaymentMethod
+  label: string
+  logo: string
+}
+
+const PAYMENT_METHOD_OPTIONS: readonly PaymentMethodOption[] = [
   { id: 'mastercard', label: 'Mastercard', logo: '/m.png' },
   { id: 'visa', label: 'Visa', logo: '/R.png' },
 ] as const
 
-type PaymentMethod = (typeof PAYMENT_METHOD_OPTIONS)[number]['id']
 type OperationType = (typeof OPERATION_OPTIONS)[number]['id']
 type ReceiptChoice = (typeof RECEIPT_OPTIONS)[number]['id']
 

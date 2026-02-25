@@ -10,7 +10,6 @@ import Image from 'next/image'
 const services = [
   { name: 'طلب خدمة البطاقة الصحية ', href: '/submit' },
   { name: 'الاستعلام عن حالة البطاقة الصحية', href: '/submit' },
-  { name: 'تجديد بطاقة الموظف', href: '/submit' },
   { name: 'طلب بطاقة موظف جديدة', href: '/submit' },
   { name: 'خدمات الرعاية الصحية الأولية', href: '/submit' },
 ]

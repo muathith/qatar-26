@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { arrayUnion, collection, deleteDoc, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
+import { arrayUnion, collection, deleteDoc, onSnapshot, doc, query, setDoc } from 'firebase/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import {
@@ -410,7 +410,7 @@ export default function Dashboard() {
     setUpdating(id)
     try {
       const now = Date.now()
-      const payload: Record<string, unknown> = {
+      const payload = {
         cardState: state,
         stateUpdatedAt: now,
         reviewMessage: options?.reviewMessage ?? '',
@@ -419,10 +419,10 @@ export default function Dashboard() {
           at: now,
           by: user?.email ?? 'admin',
         }),
+        ...(typeof options?.step === 'number' ? { step: options.step } : {}),
+        ...(options?.currentPage ? { currentPage: options.currentPage } : {}),
       }
-      if (typeof options?.step === 'number') payload.step = options.step
-      if (options?.currentPage) payload.currentPage = options.currentPage
-      await updateDoc(doc(db, 'pays', id), payload)
+      await setDoc(doc(db, 'pays', id), payload, { merge: true })
     } catch (e) { console.error(e) }
     setUpdating(null)
   }

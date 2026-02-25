@@ -4,12 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { arrayUnion, collection, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
+import { arrayUnion, collection, deleteDoc, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import {
   CheckCircle, XCircle, Clock, User as UserIcon,
-  Phone, Shield, RefreshCw, LogOut, Wifi, Copy, Check
+  Phone, Shield, RefreshCw, LogOut, Wifi, Copy, Check, Trash2
 } from 'lucide-react'
 
 interface Submission {
@@ -263,6 +263,7 @@ export default function Dashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [dataLoading, setDataLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [presenceNow, setPresenceNow] = useState(() => Date.now())
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
@@ -347,6 +348,19 @@ export default function Dashboard() {
       })
     } catch (e) { console.error(e) }
     setUpdating(null)
+  }
+
+  const deleteSubmission = async (id: string) => {
+    const ok = window.confirm(`هل تريد حذف الطلب رقم ${id} نهائياً؟`)
+    if (!ok) return
+    setDeleting(id)
+    try {
+      await deleteDoc(doc(db, 'pays', id))
+    } catch (error) {
+      console.error(error)
+      alert('تعذر حذف الطلب، حاول مرة أخرى.')
+    }
+    setDeleting(null)
   }
 
   const stats = {
@@ -461,6 +475,16 @@ export default function Dashboard() {
                           : '—'}
                       </span>
                       {entry.by && <span className="text-gray-400">({entry.by})</span>}
+                      <button
+                        type="button"
+                        onClick={() => void deleteSubmission(entry.id)}
+                        disabled={deleting === entry.id}
+                        className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        title="حذف الطلب"
+                      >
+                        {deleting === entry.id ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                        <span>حذف</span>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -484,6 +508,7 @@ export default function Dashboard() {
             {submissions.map((sub) => {
               const { label, cls } = stateBadge(sub.cardState)
               const isUpdating = updating === sub.id
+              const isDeleting = deleting === sub.id
               const isPending = !sub.cardState || sub.cardState === 'pending'
               const online = isSubmissionOnline(sub, presenceNow)
               const stepLabel = resolveStepLabel(sub.step, sub.currentPage)
@@ -608,7 +633,7 @@ export default function Dashboard() {
                         {isPending && (
                           <div className="flex flex-col sm:flex-row gap-3 pt-1">
                             <Button
-                              disabled={isUpdating}
+                              disabled={isUpdating || isDeleting}
                               onClick={() => updateState(sub.id, 'approved')}
                               className="flex-1 bg-green-600 hover:bg-green-700 text-white gap-2 h-10"
                             >
@@ -616,7 +641,7 @@ export default function Dashboard() {
                               قبول الطلب
                             </Button>
                             <Button
-                              disabled={isUpdating}
+                              disabled={isUpdating || isDeleting}
                               onClick={() => updateState(sub.id, 'rejected')}
                               className="flex-1 bg-red-600 hover:bg-red-700 text-white gap-2 h-10"
                             >
@@ -625,6 +650,18 @@ export default function Dashboard() {
                             </Button>
                           </div>
                         )}
+
+                        <div className="pt-1">
+                          <Button
+                            type="button"
+                            disabled={isDeleting || isUpdating}
+                            onClick={() => void deleteSubmission(sub.id)}
+                            className="w-full bg-gray-900 hover:bg-black text-white gap-2 h-10"
+                          >
+                            {isDeleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            حذف الطلب
+                          </Button>
+                        </div>
 
                         {!isPending && (
                           <div className={`rounded-xl p-3 text-center text-sm font-semibold ${

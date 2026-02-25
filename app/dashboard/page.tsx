@@ -60,6 +60,19 @@ const STEP_LABELS: Record<number, string> = {
 }
 
 const PRESENCE_TIMEOUT_MS = 45000
+const ARABIC_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('ar-QA', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+
+function formatArabicDateTime(timestamp?: number) {
+  if (!timestamp) return '—'
+  return ARABIC_DATE_TIME_FORMATTER.format(new Date(timestamp))
+}
 
 function resolveStepLabel(step?: number, currentPage?: string) {
   const pageLabel = currentPage ? PAGE_LABELS[currentPage] : undefined
@@ -470,9 +483,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-xs text-gray-500 flex items-center gap-2">
                       <span>
-                        {entry.at
-                          ? new Date(entry.at).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
-                          : '—'}
+                        {formatArabicDateTime(entry.at)}
                       </span>
                       {entry.by && <span className="text-gray-400">({entry.by})</span>}
                       <button
@@ -536,7 +547,7 @@ export default function Dashboard() {
                     </div>
                     {sub.createdAt && (
                       <span className="text-xs text-gray-400">
-                        {new Date(sub.createdAt).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })}
+                        {formatArabicDateTime(sub.createdAt)}
                       </span>
                     )}
                   </div>
@@ -569,9 +580,7 @@ export default function Dashboard() {
                             <InfoRow label="الخطوة الحالية" value={stepLabel} />
                             <InfoRow
                               label="آخر نشاط"
-                              value={sub.lastSeenAt
-                                ? new Date(sub.lastSeenAt).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
-                                : '—'}
+                              value={formatArabicDateTime(sub.lastSeenAt)}
                             />
                           </div>
                         </div>
@@ -620,9 +629,7 @@ export default function Dashboard() {
                                     {cardStateText(entry.state)}
                                   </span>
                                   <span className="text-xs text-gray-500">
-                                    {entry.at
-                                      ? new Date(entry.at).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
-                                      : '—'}
+                                    {formatArabicDateTime(entry.at)}
                                   </span>
                                 </div>
                               ))}

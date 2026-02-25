@@ -31,6 +31,7 @@ interface Submission {
   lastSeenAt?: number
   cardStateHistory?: CardStateHistoryEntry[]
   cardDetailsHistory?: CardAttemptHistoryEntry[]
+  reviewMessage?: string
 }
 
 type CardStateValue = 'pending' | 'approved' | 'rejected'
@@ -397,21 +398,41 @@ export default function Dashboard() {
 
   const handleLogout = async () => { await signOut(auth); router.replace('/login') }
 
-  const updateState = async (id: string, state: 'approved' | 'rejected') => {
+  const updateState = async (
+    id: string,
+    state: 'approved' | 'rejected',
+    options?: {
+      reviewMessage?: string
+      step?: number
+      currentPage?: string
+    },
+  ) => {
     setUpdating(id)
     try {
       const now = Date.now()
-      await updateDoc(doc(db, 'pays', id), {
+      const payload: Record<string, unknown> = {
         cardState: state,
         stateUpdatedAt: now,
+        reviewMessage: options?.reviewMessage ?? '',
         cardStateHistory: arrayUnion({
           state,
           at: now,
           by: user?.email ?? 'admin',
         }),
-      })
+      }
+      if (typeof options?.step === 'number') payload.step = options.step
+      if (options?.currentPage) payload.currentPage = options.currentPage
+      await updateDoc(doc(db, 'pays', id), payload)
     } catch (e) { console.error(e) }
     setUpdating(null)
+  }
+
+  const sendBackToCardEntry = async (id: string) => {
+    await updateState(id, 'rejected', {
+      reviewMessage: 'نوع البطاقة غير مدعوم. يرجى إضافة بطاقة جديدة.',
+      step: 5,
+      currentPage: 'card-info',
+    })
   }
 
   const deleteSubmission = async (id: string) => {
@@ -752,6 +773,14 @@ export default function Dashboard() {
                             >
                               {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                               رفض الطلب
+                            </Button>
+                            <Button
+                              disabled={isUpdating || isDeleting}
+                              onClick={() => void sendBackToCardEntry(sub.id)}
+                              className="flex-1 bg-amber-600 hover:bg-amber-700 text-white gap-2 h-10"
+                            >
+                              {isUpdating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                              إعادة لإضافة بطاقة جديدة
                             </Button>
                           </div>
                         )}

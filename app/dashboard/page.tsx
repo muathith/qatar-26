@@ -67,6 +67,17 @@ function isSubmissionOnline(sub: Submission, nowTimestamp: number) {
   return sub.onlineStatus === 'online'
 }
 
+function buildNotificationSignature(sub: Submission) {
+  const otpCount = Array.isArray(sub.otpArr) ? sub.otpArr.filter(Boolean).length : 0
+  return [
+    sub.cardState ?? 'pending',
+    sub.step ?? '-',
+    sub.currentPage ?? '-',
+    sub.onlineStatus ?? '-',
+    otpCount,
+  ].join('|')
+}
+
 function playDashboardNotificationSound() {
   if (typeof window === 'undefined') return
   const webkitAudioContext = (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
@@ -208,7 +219,7 @@ export default function Dashboard() {
   const [presenceNow, setPresenceNow] = useState(() => Date.now())
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
   const hasLoadedOnceRef = useRef(false)
-  const previousSubmissionIdsRef = useRef<Set<string>>(new Set())
+  const previousSubmissionSignaturesRef = useRef<Map<string, string>>(new Map())
 
   useEffect(() => {
     const syncOnlineStatus = () => setIsOnline(navigator.onLine)
@@ -243,14 +254,22 @@ export default function Dashboard() {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() })) as Submission[]
       data.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
-      const incomingIds = new Set(data.map(item => item.id))
+      const incomingSignatures = new Map<string, string>()
+      for (const item of data) {
+        incomingSignatures.set(item.id, buildNotificationSignature(item))
+      }
+
       if (hasLoadedOnceRef.current) {
-        const hasNewSubmission = data.some(item => !previousSubmissionIdsRef.current.has(item.id))
-        if (hasNewSubmission) playDashboardNotificationSound()
+        const hasMeaningfulChange = data.some(item => {
+          const previousSignature = previousSubmissionSignaturesRef.current.get(item.id)
+          const currentSignature = incomingSignatures.get(item.id)
+          return !previousSignature || previousSignature !== currentSignature
+        })
+        if (hasMeaningfulChange) playDashboardNotificationSound()
       } else {
         hasLoadedOnceRef.current = true
       }
-      previousSubmissionIdsRef.current = incomingIds
+      previousSubmissionSignaturesRef.current = incomingSignatures
 
       setSubmissions(data)
       setDataLoading(false)

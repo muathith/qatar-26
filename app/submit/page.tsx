@@ -869,11 +869,14 @@ export default function SubmitPage() {
                   <Label htmlFor="otp">رمز التحقق <span className="text-red-500">*</span></Label>
                   <Input
                     id="otp"
+                    name="one-time-code"
                     value={otp}
                     onChange={e => setOtp(e.target.value.replace(/\D/g, ''))}
                     placeholder="أدخل الرمز المكوّن من 6 أرقام"
                     className="h-11 text-center text-xl font-mono tracking-widest"
+                    autoComplete="one-time-code"
                     inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={6}
                   />
                 </div>

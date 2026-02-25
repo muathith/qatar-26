@@ -20,7 +20,7 @@ export default function RootLayout({
       <head />
       <body className="min-h-screen flex flex-col bg-gray-50">
         <header className="border-b sticky top-0 bg-white z-50 shadow-sm">
-          <div className="container mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="container mx-auto px-3 sm:px-4 py-2 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <button className="p-2 rounded-md hover:bg-gray-100 transition-colors">
                 <MenuIcon className="w-5 h-5 text-gray-600" />
@@ -32,7 +32,7 @@ export default function RootLayout({
                 alt="Qatar Government Logo"
                 width={180}
                 height={50}
-                className="h-10 sm:h-12 w-auto"
+                className="h-9 sm:h-12 w-auto"
               />
             </Link>
           </div>

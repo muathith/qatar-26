@@ -5,10 +5,10 @@ import Link from "next/link"
 export function Footer() {
   return (
     <footer className="bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto  lg:px-8">
-        <div className="text-center mb-8 bg-[#891538] w-full p-4  rounded-t-lg">
-          <h2 className="text-2xl mb-6">حكومي - بوابتك الرسمية للمعلومات والخدمات في قطر</h2>
-          <div className="flex justify-center gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-8 bg-[#891538] w-full p-4 sm:p-5 rounded-t-lg">
+          <h2 className="text-lg sm:text-2xl mb-5 sm:mb-6">حكومي - بوابتك الرسمية للمعلومات والخدمات في قطر</h2>
+          <div className="flex justify-center gap-5 sm:gap-8">
             <Link href="#" className="hover:opacity-80">
               <Instagram className="w-6 h-6" />
             </Link>
@@ -26,7 +26,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-right mb-12 ">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-right mb-10 sm:mb-12">
           <div>
             <h3 className="text-xl mb-4">روابط سريعة</h3>
             <ul className="space-y-2">
@@ -57,7 +57,7 @@ export function Footer() {
             </ul>
           </div>
 
-          <div className="flex flex-col items-center md:items-end gap-4 ">
+          <div className="flex flex-col items-center md:items-end gap-4">
             <Image
               src="/Hukoomi-new-logo-ar.svg"
               alt="Qatar Government Logo"
@@ -65,7 +65,7 @@ export function Footer() {
               height={80}
               className="invert"
             />
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-center">
               <Link href="#" className="hover:opacity-80">
                 <Image
                   src="/app-store.svg"
@@ -88,7 +88,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="text-center pt-8 border-t border-white/20">
+        <div className="text-center pt-6 sm:pt-8 pb-6 border-t border-white/20">
           <div className="flex justify-center mb-4">
            
           </div>

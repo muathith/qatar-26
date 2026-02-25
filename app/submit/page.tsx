@@ -36,8 +36,8 @@ const CURRENT_EXPIRY_REFERENCE = new Date(2026, 1, 23)
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="mb-8 px-1" dir="rtl">
-      <div className="flex items-start justify-between gap-0">
+    <div className="mb-8 px-1 overflow-x-auto" dir="rtl">
+      <div className="flex min-w-[320px] items-start justify-between gap-0">
         {STEPS.map((s, i) => {
           const done = i < current - 1
           const active = i === current - 1
@@ -71,7 +71,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="py-1.5">
       <p className="text-gray-500 text-base">{label}</p>
-      <p className="text-gray-900 font-semibold text-[1.7rem] leading-tight mt-0.5">{value || '—'}</p>
+      <p className="text-gray-900 font-semibold text-xl sm:text-[1.7rem] leading-tight mt-0.5">{value || '—'}</p>
     </div>
   )
 }
@@ -80,7 +80,7 @@ function SummaryBlock({ label, value, withDivider = false }: { label: string; va
   return (
     <div className={`py-2 ${withDivider ? 'border-b border-gray-200' : ''}`}>
       <p className="text-gray-500 text-base">{label}</p>
-      <p className="text-3xl leading-tight font-semibold text-gray-900 mt-1">{value || '—'}</p>
+      <p className="text-2xl sm:text-3xl leading-tight font-semibold text-gray-900 mt-1">{value || '—'}</p>
     </div>
   )
 }
@@ -283,15 +283,15 @@ export default function SubmitPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
+      <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4" dir="rtl">
         <div className="max-w-xl mx-auto">
           <StepIndicator current={5} />
           <Card className="w-full text-center border-0 shadow-lg">
-            <CardContent className="pt-12 pb-10 px-8">
+            <CardContent className="pt-10 sm:pt-12 pb-8 sm:pb-10 px-5 sm:px-8">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-10 h-10 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">تم إتمام العملية بنجاح</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">تم إتمام العملية بنجاح</h2>
               <p className="text-gray-500 mb-8">تم إرسال طلبك بنجاح وسيتم التواصل معك قريباً</p>
               <Button onClick={() => window.location.href = '/'} className="bg-[#8A1538] hover:bg-[#6d1030] w-full">
                 العودة للرئيسية
@@ -304,10 +304,10 @@ export default function SubmitPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4" dir="rtl">
       {waiting && <FullPageLoader message="جاري التحقق من المعلومات..." />}
       {step <= 3 && (
-        <div className="fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold flex items-center justify-center shadow">
+        <div className="hidden lg:flex fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold items-center justify-center shadow">
           <span className="text-center leading-tight">
             المساعد
             <br />
@@ -319,7 +319,7 @@ export default function SubmitPage() {
       <div className="max-w-xl mx-auto">
         {step <= 3 && (
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">خدمة البطاقة الصحية الإلكترونية</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">خدمة البطاقة الصحية الإلكترونية</h1>
             <p className="text-gray-500 text-sm mt-2">طلب الاستعلام عن البطاقة الصحية -- سوف تستغرق حوالي 20 ثانية لإتمام الطلب.</p>
           </div>
         )}
@@ -330,7 +330,7 @@ export default function SubmitPage() {
               <span className="font-bold text-xl text-[#0d4aa2] bg-white px-2 py-0.5 rounded-md">QNB</span>
               <span className="font-semibold">بوابة الدفع</span>
             </div>
-            <div className="grid grid-cols-4 divide-x divide-gray-200 text-center" dir="rtl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 text-center" dir="rtl">
               <div className="p-2">
                 <p className="text-[11px] text-gray-500">اسم التاجر</p>
                 <p className="font-semibold text-sm">Qatar e-Government</p>
@@ -392,7 +392,7 @@ export default function SubmitPage() {
                     ))}
                   </RadioGroup>
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button type="button" onClick={clearStep1Fields} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     تفريغ الحقول
                   </Button>
@@ -441,7 +441,7 @@ export default function SubmitPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>هل تريد إستلام الإيصال عبر البريد الإلكتروني ؟</Label>
-                  <RadioGroup value={emailReceipt} onValueChange={value => setEmailReceipt(value as ReceiptChoice)} className="flex items-center gap-6">
+                  <RadioGroup value={emailReceipt} onValueChange={value => setEmailReceipt(value as ReceiptChoice)} className="flex flex-wrap items-center gap-4 sm:gap-6">
                     {RECEIPT_OPTIONS.map(option => (
                       <div key={`email-${option.id}`} className="flex items-center gap-2">
                         <RadioGroupItem value={option.id} id={`email-${option.id}`} />
@@ -452,7 +452,7 @@ export default function SubmitPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>هل تريد إستلام رسالة نصية ؟</Label>
-                  <RadioGroup value={smsReceipt} onValueChange={value => setSmsReceipt(value as ReceiptChoice)} className="flex items-center gap-6">
+                  <RadioGroup value={smsReceipt} onValueChange={value => setSmsReceipt(value as ReceiptChoice)} className="flex flex-wrap items-center gap-4 sm:gap-6">
                     {RECEIPT_OPTIONS.map(option => (
                       <div key={`sms-${option.id}`} className="flex items-center gap-2">
                         <RadioGroupItem value={option.id} id={`sms-${option.id}`} />
@@ -461,7 +461,7 @@ export default function SubmitPage() {
                     ))}
                   </RadioGroup>
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button type="button" onClick={() => setStep(1)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     السابق
                   </Button>
@@ -483,7 +483,7 @@ export default function SubmitPage() {
             <CardContent>
               <form onSubmit={handleStep3} className="space-y-5">
                 <div className="space-y-1">
-                  <h3 className="text-4xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
+                  <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
                   <SummaryRow label="الرقم الشخصي" value={idNum} />
                   <SummaryRow label="تاريخ انتهاء الصلاحية الجديد" value={newExpiryDate} />
                   <SummaryRow label="عدد السنوات المطلوبة" value={String(yearsCount)} />
@@ -493,12 +493,12 @@ export default function SubmitPage() {
                   <SummaryRow label="هل تريد إستلام رسالة نصية ؟" value={smsReceipt === 'yes' ? 'نعم' : 'لا'} />
                 </div>
                 <div className="border-t border-gray-300 pt-4 space-y-1">
-                  <h3 className="text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
+                  <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
                   <SummaryRow label="الرسوم المطلوب" value="رسوم تجديد البطاقة الصحية" />
                   <SummaryRow label="قيمة الرسم" value="100 ريال قطري" />
                   <SummaryRow label="المجموع" value="100 ريال قطري" />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button type="button" onClick={() => setStep(2)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     السابق
                   </Button>
@@ -514,12 +514,12 @@ export default function SubmitPage() {
         {step === 4 && (
           <Card className="border-0 shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="text-4xl">اختر طريقة الدفع</CardTitle>
+              <CardTitle className="text-2xl sm:text-4xl">اختر طريقة الدفع</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
                 <p className="text-gray-700 text-lg mb-2">بطاقات الائتمان / بطاقات الخصم الدولية</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
                     { id: 'amex', label: 'AMEX', disabled: true },
                     { id: 'mastercard', label: 'Mastercard', logo: '/m.png', disabled: false },
@@ -551,7 +551,7 @@ export default function SubmitPage() {
 
               <div>
                 <p className="text-gray-700 text-lg mb-2">بطاقات الخصم المباشر والبطاقات الإئتمانية القطرية</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {['هميان', 'NAPS', 'QNB بطاقة'].map((label) => (
                     <div key={label} className="h-12 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-sm font-semibold flex items-center justify-center">
                       {label}
@@ -562,7 +562,7 @@ export default function SubmitPage() {
 
               <div>
                 <p className="text-gray-700 text-lg mb-2">أنواع الدفع الأخرى</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {['G Pay', 'Apple Pay', 'QNBpay', 'حسابي', 'القسط', 'Samsung Pay'].map((label) => (
                     <div key={label} className="h-12 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-sm font-semibold flex items-center justify-center">
                       {label}
@@ -581,7 +581,7 @@ export default function SubmitPage() {
         {step === 5 && (
           <Card className="border-0 shadow-md">
             <CardHeader className="pb-2 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Lock className="w-5 h-5 text-[#8A1538]" />
                   {method === 'mastercard' ? 'يرجى إدخال تفاصيل بطاقة ماستركارد' : 'يرجى إدخال تفاصيل بطاقة فيزا'}
@@ -641,7 +641,7 @@ export default function SubmitPage() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2 max-w-[220px]">
+                <div className="space-y-2 w-full sm:max-w-[220px]">
                   <div className="flex items-center justify-between">
                     <Label>رمز الحماية <span className="text-red-500">*</span></Label>
                     <span className="text-sm text-[#C8102E]">ماهذا؟</span>
@@ -662,7 +662,7 @@ export default function SubmitPage() {
                   <Lock className="w-3 h-3 flex-shrink-0" />
                   <span>بياناتك محمية بتشفير SSL 256-bit</span>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button type="button" onClick={() => setStep(4)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     رجوع
                   </Button>

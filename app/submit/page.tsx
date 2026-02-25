@@ -866,18 +866,6 @@ export default function SubmitPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleStep6} className="space-y-5">
-                {otpList.length > 0 && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-xs text-yellow-800 mb-2 font-medium">الرموز المُدخلة سابقاً:</p>
-                    <div className="flex flex-wrap gap-1">
-                      {otpList.map((o, i) => (
-                        <span key={i} className="bg-yellow-100 text-yellow-800 text-xs font-mono px-2 py-0.5 rounded">
-                          {o}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="otp">رمز التحقق <span className="text-red-500">*</span></Label>
                   <Input

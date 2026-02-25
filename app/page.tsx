@@ -44,28 +44,30 @@ export default function HomePage() {
     <div dir="rtl" className="min-h-screen bg-gray-50">
       <Hero />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10 space-y-6 pb-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 sm:-mt-8 relative z-10 space-y-6 pb-12">
 
-        <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-2 border-b border-gray-100">
+        <div id="services" className="bg-white rounded-2xl shadow-lg overflow-hidden">
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-2 border-b border-gray-100">
             <h2 className="text-lg font-bold text-gray-900">الخدمات الإلكترونية</h2>
             <p className="text-sm text-gray-500 mt-0.5">اختر الخدمة التي تحتاجها</p>
           </div>
           <div className="divide-y divide-gray-50">
             {services.map((service, i) => (
               <Link key={i} href={service.href}
-                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors group">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-[#8A1538]/10 flex items-center justify-center">
+                className="flex items-start sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 hover:bg-gray-50 transition-colors group">
+                <div className="flex items-start sm:items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-[#8A1538]/10 flex items-center justify-center flex-shrink-0">
                     <Bookmark className="w-4 h-4 text-[#8A1538]" />
                   </div>
-                  <span className="text-gray-800 font-medium group-hover:text-[#8A1538] transition-colors">{service.name}</span>
+                  <span className="text-gray-800 text-sm sm:text-base font-medium group-hover:text-[#8A1538] transition-colors leading-relaxed">
+                    {service.name}
+                  </span>
                 </div>
-                <ChevronLeft className="w-4 h-4 text-gray-400 group-hover:text-[#8A1538] transition-colors" />
+                <ChevronLeft className="w-4 h-4 text-gray-400 group-hover:text-[#8A1538] transition-colors flex-shrink-0 mt-1 sm:mt-0" />
               </Link>
             ))}
           </div>
-          <div className="px-6 py-4 bg-gray-50/50">
+          <div className="px-4 sm:px-6 py-4 bg-gray-50/50">
             <Link href="/submit"
               className="flex items-center gap-2 text-[#8A1538] text-sm font-semibold hover:underline">
               <ArrowLeft className="w-4 h-4" />
@@ -77,14 +79,14 @@ export default function HomePage() {
         <StatisticsSection />
 
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-gray-100">
             <h2 className="text-lg font-bold text-gray-900">آخر الأخبار</h2>
             <p className="text-sm text-gray-500 mt-0.5">تابع أحدث الأخبار والإعلانات الرسمية</p>
           </div>
           <div className="divide-y divide-gray-100">
             {news.map((item) => (
-              <div key={item.id} className="flex gap-4 p-5 hover:bg-gray-50 transition-colors">
-                <div className="flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-gray-100">
+              <div key={item.id} className="flex flex-col sm:flex-row gap-4 p-4 sm:p-5 hover:bg-gray-50 transition-colors">
+                <div className="flex-shrink-0 w-full sm:w-20 h-44 sm:h-20 rounded-xl overflow-hidden bg-gray-100">
                   <Image
                     src={item.image}
                     alt={item.title}
@@ -104,12 +106,12 @@ export default function HomePage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-gray-100">
             <h2 className="text-lg font-bold text-gray-900">الحكومة</h2>
             <p className="text-sm text-gray-500 mt-0.5">معلومات عن القيادة والمؤسسات الحكومية</p>
           </div>
-          <div className="p-5 flex gap-5">
-            <div className="flex-shrink-0 w-28 h-36 rounded-xl overflow-hidden bg-gray-100">
+          <div className="p-4 sm:p-5 flex flex-col sm:flex-row gap-4 sm:gap-5">
+            <div className="flex-shrink-0 w-full sm:w-28 h-64 sm:h-36 rounded-xl overflow-hidden bg-gray-100">
               <Image src="/amirs.png" alt="سمو الأمير" width={112} height={144} className="w-full h-full object-cover" />
             </div>
             <div className="flex-1">
@@ -123,11 +125,11 @@ export default function HomePage() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-          <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <div className="px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-gray-100">
             <h2 className="text-lg font-bold text-gray-900">قطر للجميع</h2>
             <p className="text-sm text-gray-500 mt-0.5">خدمات مخصصة لجميع فئات المجتمع</p>
           </div>
-          <div className="p-5 grid grid-cols-3 sm:grid-cols-5 gap-4">
+          <div className="p-4 sm:p-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
             {[
               { label: 'كبار السن', img: '/1.svg' },
               { label: 'العمالة الوافدة', img: '/2.svg' },

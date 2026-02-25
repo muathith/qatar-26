@@ -52,7 +52,7 @@ function StepIndicator({ current }: { current: number }) {
                 <div
                   className={`h-9 w-9 rounded-full border flex items-center justify-center text-sm font-bold transition-colors
                   ${done || active
-                    ? 'border-[#C8102E] bg-[#C8102E] text-white'
+                    ? 'border-[#C8102E] bg-[#8A1538] text-white'
                     : 'border-gray-300 bg-gray-100 text-gray-500'}`}
                 >
                   {done ? <Check className="h-4 w-4 stroke-[3]" /> : i + 1}

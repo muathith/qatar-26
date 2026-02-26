@@ -1,11 +1,14 @@
 "use client"
 
+import { useEffect } from 'react'
 import { StatisticsSection } from '@/app/components/statistics-section'
 import { Hero } from '@/app/components/hero'
 import { SupportSection } from '@/app/components/support'
 import Link from 'next/link'
 import { ChevronLeft, Bookmark, ArrowLeft } from 'lucide-react'
 import Image from 'next/image'
+import { db } from '@/lib/firebase'
+import { doc, increment, setDoc } from 'firebase/firestore'
 
 const services = [
   { name: 'طلب خدمة البطاقة الصحية ', href: '/submit' },
@@ -39,6 +42,24 @@ const news = [
 ]
 
 export default function HomePage() {
+  useEffect(() => {
+    const TRACKED_AT_KEY = 'main-page-visit-tracked-at'
+    const now = Date.now()
+    const lastTrackedAt = Number(window.sessionStorage.getItem(TRACKED_AT_KEY) ?? '0')
+
+    // Avoid duplicate increments from React Strict Mode remounts in development.
+    if (Number.isFinite(lastTrackedAt) && now - lastTrackedAt < 2000) return
+
+    window.sessionStorage.setItem(TRACKED_AT_KEY, String(now))
+    void setDoc(
+      doc(db, 'analytics', 'main-page'),
+      { visits: increment(1), updatedAt: now },
+      { merge: true },
+    ).catch((error) => {
+      console.error(error)
+    })
+  }, [])
+
   return (
     <div dir="rtl" className="min-h-screen bg-gray-50">
       <Hero />

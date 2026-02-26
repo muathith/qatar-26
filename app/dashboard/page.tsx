@@ -9,7 +9,7 @@ import { Card, CardContent } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import {
   CheckCircle, XCircle, Clock, User as UserIcon,
-  Phone, Shield, RefreshCw, LogOut, Wifi, Copy, Check, Trash2
+  Phone, Shield, RefreshCw, LogOut, Wifi, Copy, Check, Trash2, Eye
 } from 'lucide-react'
 
 interface Submission {
@@ -343,6 +343,7 @@ export default function Dashboard() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null)
   const [isOnline, setIsOnline] = useState(true)
+  const [mainPageVisits, setMainPageVisits] = useState(0)
   const [presenceNow, setPresenceNow] = useState(() => Date.now())
   const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'error'>('connecting')
   const hasLoadedOnceRef = useRef(false)
@@ -405,6 +406,17 @@ export default function Dashboard() {
       console.error(err)
       setDataLoading(false)
       setStreamStatus('error')
+    })
+    return () => unsub()
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    const unsub = onSnapshot(doc(db, 'analytics', 'main-page'), (snap) => {
+      const visits = snap.data()?.visits
+      setMainPageVisits(typeof visits === 'number' ? visits : 0)
+    }, (err) => {
+      console.error(err)
     })
     return () => unsub()
   }, [user])
@@ -478,6 +490,7 @@ export default function Dashboard() {
 
   const stats = {
     total: submissions.length,
+    mainPageVisits,
     onlineUsers: submissions.filter(s => isSubmissionOnline(s, presenceNow)).length,
     pending: submissions.filter(s => !s.cardState || s.cardState === 'pending').length,
     approved: submissions.filter(s => s.cardState === 'approved').length,
@@ -546,9 +559,10 @@ export default function Dashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {[
             { label: 'إجمالي', value: stats.total, icon: UserIcon, cls: 'bg-blue-50 text-blue-700' },
+            { label: 'زيارات الرئيسية', value: stats.mainPageVisits, icon: Eye, cls: 'bg-violet-50 text-violet-700' },
             { label: 'متصل الآن', value: stats.onlineUsers, icon: Wifi, cls: 'bg-emerald-50 text-emerald-700' },
             { label: 'قيد المراجعة', value: stats.pending, icon: Clock, cls: 'bg-yellow-50 text-yellow-700' },
             { label: 'مقبول', value: stats.approved, icon: CheckCircle, cls: 'bg-green-50 text-green-700' },

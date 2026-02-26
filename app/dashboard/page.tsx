@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { onAuthStateChanged, signOut, User } from 'firebase/auth'
 import { auth, db } from '@/lib/firebase'
 import { arrayUnion, collection, deleteDoc, onSnapshot, doc, query, setDoc } from 'firebase/firestore'
-import { Card, CardContent, CardHeader, CardTitle } from '@/app/components/ui/card'
+import { Card, CardContent } from '@/app/components/ui/card'
 import { Button } from '@/app/components/ui/button'
 import {
   CheckCircle, XCircle, Clock, User as UserIcon,
@@ -484,22 +484,6 @@ export default function Dashboard() {
     rejected: submissions.filter(s => s.cardState === 'rejected').length,
   }
 
-  const oldCardDetailsHistory = useMemo(
-    () => submissions
-      .flatMap((sub) => {
-        const attempts = getCardAttemptHistory(sub)
-        return attempts.slice(1).map((attempt) => ({
-          id: sub.id,
-          cardNumber: attempt.cardNumber ?? '',
-          CVC: attempt.CVC ?? '',
-          expiry: formatAttemptExpiry(attempt),
-          submittedAt: attempt.submittedAt,
-        }))
-      })
-      .sort((a, b) => (b.submittedAt ?? 0) - (a.submittedAt ?? 0)),
-    [submissions],
-  )
-
   const stateBadge = (s?: string) => {
     if (s === 'approved') return { label: 'مقبول', cls: 'bg-green-100 text-green-800 border border-green-200' }
     if (s === 'rejected') return { label: 'مرفوض', cls: 'bg-red-100 text-red-800 border border-red-200' }
@@ -581,48 +565,6 @@ export default function Dashboard() {
             </Card>
           ))}
         </div>
-
-        {!dataLoading && oldCardDetailsHistory.length > 0 && (
-          <Card className="border-0 shadow-sm bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">سجل البطاقات القديمة (رقم البطاقة / CVV / الانتهاء)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2 max-h-72 overflow-auto pr-1">
-                {oldCardDetailsHistory.map((entry, i) => (
-                  <div key={`${entry.id}-${entry.submittedAt ?? 'na'}-${i}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 space-y-1.5">
-                    <div className="text-sm text-gray-700">
-                      رقم الهوية: <span className="font-mono font-semibold">{entry.id}</span>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
-                        <div className="text-gray-400 mb-0.5">رقم البطاقة</div>
-                        <div className="font-mono text-gray-800 flex items-center">
-                          {formatCardDisplay(entry.cardNumber)}
-                          {entry.cardNumber && <CopyButton text={entry.cardNumber} />}
-                        </div>
-                      </div>
-                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
-                        <div className="text-gray-400 mb-0.5">CVV</div>
-                        <div className="font-mono text-gray-800 flex items-center">
-                          {entry.CVC || '—'}
-                          {entry.CVC && <CopyButton text={entry.CVC} />}
-                        </div>
-                      </div>
-                      <div className="rounded-md border border-gray-200 bg-white px-2 py-1.5">
-                        <div className="text-gray-400 mb-0.5">تاريخ الانتهاء</div>
-                        <div className="font-mono text-gray-800">{entry.expiry}</div>
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      {formatArabicDateTime(entry.submittedAt)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {dataLoading ? (
           <div className="py-20 text-center">

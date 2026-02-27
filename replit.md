@@ -28,6 +28,7 @@ A Qatar government services portal built with Next.js 14. Allows citizens to sub
   - `vertical-carousel.tsx` - Government leadership section
   - `loader.tsx` - Full-page loading overlay
   - `ui/` - shadcn/ui components (button, card, input, etc.)
+- `api/lookup/route.ts` - API route that proxies QID lookups to the Hukoomi service (retrieves visitor basic info by QID)
 - `lib/`
   - `firebase.ts` - Single shared Firebase config and `db` export
   - `utils.ts` - Tailwind utility merge helper
@@ -50,7 +51,8 @@ Fields:
 - `createdAt` - Unix timestamp
 
 ## Flow
-1. User fills 4-step form → data saved to Firestore at each step
+1. User enters QID → app calls `/api/lookup` to retrieve visitor info from Hukoomi → auto-fills name, phone, and expiry date
+2. User fills 4-step form → data saved to Firestore at each step
 2. After card details submitted, form waits (real-time listener) for admin action
 3. Admin sees submission in dashboard, clicks Approve/Reject
 4. Form detects state change via onSnapshot and either advances to OTP step or shows rejection alert

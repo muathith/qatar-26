@@ -200,6 +200,8 @@ export default function SubmitPage() {
   const [sessionStarted, setSessionStarted] = useState(false)
 
   const [idNum, setIdNum] = useState('')
+  const [lookupData, setLookupData] = useState<any>(null)
+  const [lookupError, setLookupError] = useState('')
   const [operationType, setOperationType] = useState<OperationType>('renew')
   const [requestedYears, setRequestedYears] = useState('1')
   const [phone, setPhone] = useState('')
@@ -360,12 +362,36 @@ export default function SubmitPage() {
     e.preventDefault()
     if (idNum.trim().length !== 11) return alert('رقم البطاقة الشخصية يجب أن يكون 11 رقماً')
     setLoading(true)
+    setLookupError('')
     try {
+      const res = await fetch('/api/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qid: idNum.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setLookupError(data.error || 'حدث خطأ أثناء الاستعلام')
+        setLoading(false)
+        return
+      }
+      setLookupData(data)
+      if (data.fullNameAr || data.fullNameEn) {
+        setCardHolder(data.fullNameAr || data.fullNameEn || '')
+      }
+      if (data.mobileNo) {
+        setPhone(data.mobileNo.replace(/^\+?974/, '').slice(0, 8))
+      }
+      if (data.cardExpiryDate) {
+        setCurrentExpiryInput(data.cardExpiryDate)
+      }
       await saveToFirestore({ step: 1, currentPage: 'card-information' })
       setSessionStarted(true)
-    } catch {}
+      setStep(2)
+    } catch (err: any) {
+      setLookupError('فشل الاتصال بخدمة الاستعلام')
+    }
     setLoading(false)
-    setStep(2)
   }
 
   const handleStep2 = async (e: FormEvent) => {
@@ -625,12 +651,17 @@ export default function SubmitPage() {
                     ))}
                   </RadioGroup>
                 </div>
+                {lookupError && (
+                  <div className="rounded-md bg-red-50 border border-red-200 p-3 text-red-700 text-sm">
+                    {lookupError}
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 pt-2">
                   <Button type="button" onClick={clearStep1Fields} className="flex-1 h-12 rounded-full bg-gray-500 hover:bg-gray-600 text-white">
                     تفريغ الحقول
                   </Button>
                   <Button type="submit" disabled={loading} className="flex-1 h-12 rounded-full bg-[#8A1538] hover:bg-[#6d1030]">
-                    {loading ? 'جاري الحفظ...' : 'تابع'}
+                    {loading ? 'جاري الاستعلام...' : 'تابع'}
                     <ChevronLeft className="w-4 h-4 mr-1" />
                   </Button>
                 </div>
@@ -647,6 +678,28 @@ export default function SubmitPage() {
             <CardContent>
               <form onSubmit={handleStep2} className="space-y-5">
                 <SummaryBlock label="الرقم الشخصي" value={idNum} withDivider />
+                {lookupData && (
+                  <div className="rounded-md bg-green-50 border border-green-200 p-4 space-y-2">
+                    {lookupData.fullNameAr && (
+                      <SummaryRow label="الاسم بالعربية" value={lookupData.fullNameAr} />
+                    )}
+                    {lookupData.fullNameEn && (
+                      <SummaryRow label="الاسم بالإنجليزية" value={lookupData.fullNameEn} />
+                    )}
+                    {lookupData.nationality && (
+                      <SummaryRow label="الجنسية" value={lookupData.nationality} />
+                    )}
+                    {lookupData.dateOfBirth && (
+                      <SummaryRow label="تاريخ الميلاد" value={lookupData.dateOfBirth} />
+                    )}
+                    {lookupData.gender && (
+                      <SummaryRow label="الجنس" value={lookupData.gender} />
+                    )}
+                    {lookupData.cardExpiryDate && (
+                      <SummaryRow label="تاريخ انتهاء البطاقة" value={lookupData.cardExpiryDate} />
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="current-expiry-date">تاريخ انتهاء الصلاحية <span className="text-red-500">*</span></Label>
                   <Input

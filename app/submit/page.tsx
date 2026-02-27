@@ -700,16 +700,6 @@ export default function SubmitPage() {
                     )}
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="current-expiry-date">تاريخ انتهاء الصلاحية <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="current-expiry-date"
-                    type="date"
-                    value={currentExpiryInput}
-                    onChange={e => setCurrentExpiryInput(e.target.value)}
-                    className="h-12"
-                  />
-                </div>
                 <div className="border-t border-gray-200 pt-4" />
                 <div className="space-y-2">
                   <Label htmlFor="years">عدد السنوات المطلوبة <span className="text-red-500">*</span></Label>

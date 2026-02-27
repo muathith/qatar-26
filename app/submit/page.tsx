@@ -567,16 +567,6 @@ export default function SubmitPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4" dir="rtl">
       {waiting && <FullPageLoader message="جاري التحقق من المعلومات..." />}
-      {step <= 3 && (
-        <div className="hidden lg:flex fixed left-1 top-48 z-20 h-20 w-11 rounded-r-md rounded-l-sm bg-[#C8102E] text-white text-xl font-bold items-center justify-center shadow">
-          <span className="text-center leading-tight">
-            المساعد
-            <br />
-            ة
-          </span>
-        </div>
-      )}
-
       <div className="max-w-xl mx-auto">
         {step <= 3 && (
           <div className="text-center mb-8">

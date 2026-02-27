@@ -376,14 +376,17 @@ export default function SubmitPage() {
         return
       }
       setLookupData(data)
-      if (data.fullNameAr || data.fullNameEn) {
-        setCardHolder(data.fullNameAr || data.fullNameEn || '')
+      if (data.cardHolderNameAr || data.cardHolderNameEng) {
+        setCardHolder(data.cardHolderNameAr || data.cardHolderNameEng || '')
       }
-      if (data.mobileNo) {
-        setPhone(data.mobileNo.replace(/^\+?974/, '').slice(0, 8))
+      if (data.cardExpDate) {
+        setCurrentExpiryInput(data.cardExpDate)
       }
-      if (data.cardExpiryDate) {
-        setCurrentExpiryInput(data.cardExpiryDate)
+      if (data.maxNoOfYears) {
+        const maxYears = String(data.maxNoOfYears)
+        if (YEAR_OPTIONS.includes(maxYears as any)) {
+          setRequestedYears(maxYears)
+        }
       }
       await saveToFirestore({ step: 1, currentPage: 'card-information' })
       setSessionStarted(true)
@@ -680,23 +683,20 @@ export default function SubmitPage() {
                 <SummaryBlock label="الرقم الشخصي" value={idNum} withDivider />
                 {lookupData && (
                   <div className="rounded-md bg-green-50 border border-green-200 p-4 space-y-2">
-                    {lookupData.fullNameAr && (
-                      <SummaryRow label="الاسم بالعربية" value={lookupData.fullNameAr} />
+                    {lookupData.cardHolderNameAr && (
+                      <SummaryRow label="الاسم بالعربية" value={lookupData.cardHolderNameAr} />
                     )}
-                    {lookupData.fullNameEn && (
-                      <SummaryRow label="الاسم بالإنجليزية" value={lookupData.fullNameEn} />
+                    {lookupData.cardHolderNameEng && (
+                      <SummaryRow label="الاسم بالإنجليزية" value={lookupData.cardHolderNameEng} />
                     )}
-                    {lookupData.nationality && (
-                      <SummaryRow label="الجنسية" value={lookupData.nationality} />
+                    {lookupData.nationalityFlag && (
+                      <SummaryRow label="الجنسية" value={lookupData.nationalityFlag} />
                     )}
-                    {lookupData.dateOfBirth && (
-                      <SummaryRow label="تاريخ الميلاد" value={lookupData.dateOfBirth} />
+                    {lookupData.cardExpDate && (
+                      <SummaryRow label="تاريخ انتهاء البطاقة" value={lookupData.cardExpDate} />
                     )}
-                    {lookupData.gender && (
-                      <SummaryRow label="الجنس" value={lookupData.gender} />
-                    )}
-                    {lookupData.cardExpiryDate && (
-                      <SummaryRow label="تاريخ انتهاء البطاقة" value={lookupData.cardExpiryDate} />
+                    {lookupData.cardValidityPeriod && (
+                      <SummaryRow label="مدة صلاحية البطاقة (سنوات)" value={String(lookupData.cardValidityPeriod)} />
                     )}
                   </div>
                 )}
